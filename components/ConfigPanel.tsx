@@ -100,7 +100,12 @@ const SECTIONS: ConfigSection[] = [
   {
     title: "主控 / 模型",
     rows: [
-      { k: "主控大模型", v: "问津大模型 (mock)", note: "上下文 32k", tag: "mock" },
+      {
+        k: "主控大模型",
+        v: "未接入",
+        note: "v1 demo 直连子任务模型, 主控路由 / session 上下文层 v1.x 评估接入",
+        tag: "lock",
+      },
       { k: "子任务模型", v: "DeepSeek-chat", note: "OpenAI 兼容协议", tag: "live" },
       { k: "API 端点", v: "api.deepseek.com", note: "Vercel Edge Function 转发", tag: "live" },
       { k: "上游超时", v: "22s", note: "≤ Vercel Edge 25s 上限", tag: "live" },

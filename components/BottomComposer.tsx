@@ -106,7 +106,7 @@ export function BottomComposer({ stage, agent, onPickAgent, onSubmitQuery }: Bot
           </div>
           <div style={{ ...leftToolsStyle, gap: 10 }}>
             <span style={{ color: "var(--fg-3)", fontSize: 11 }}>
-              主控: 问津大模型 · 上下文 5 / 32k
+              v1 demo · 直连 DeepSeek · 主控未接入
             </span>
             <button
               style={{ ...sendStyle, opacity: canSend ? 1 : 0.45, cursor: canSend ? "pointer" : "not-allowed" }}

@@ -31,19 +31,25 @@ export function downloadCsv(filename: string, rows: Record<string, unknown>[], h
   URL.revokeObjectURL(url);
 }
 
+// Agent 1 排序结果 CSV 导出
+// PRD v0.9 sec 3.2.2 step 7 锁前 5 列基线: cve / vpt 三维基线分 / 综合排序分 / 数据来源 / 补丁状态
+// 后续扩展列 (rank/name/asset/scene_*/desc) 放在 5 列基线之后, 不破坏 PRD 锁定的顺序
+// 补丁状态: A1 单跑默认填 "未查询" (PRD 明文); 仅当 session 经过 A2 补丁库匹配后才填真实状态
 export function exportRankingCsv(rows: RankedVuln[]): void {
   const flat = rows.map((r) => ({
-    rank: r.rk,
     cve: r.cve,
-    name: r.name,
-    asset: r.asset,
     vpt_a: r.vptA,
     vpt_v: r.vptV,
     vpt_i: r.vptI,
+    final_score: r.score,
+    source: "内部漏洞库",
+    patch_status: "未查询",
+    rank: r.rk,
+    name: r.name,
+    asset: r.asset,
     base_score: r.base,
     scene_tag: r.sceneTag,
     scene_weight: r.sceneWeight,
-    final_score: r.score,
     desc: r.desc,
   }));
   downloadCsv("agent1-ranking.csv", flat);
