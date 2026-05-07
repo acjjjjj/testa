@@ -404,7 +404,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 .scn-lbl { color: rgba(41,38,27,.72); font-weight: 500; }
 .scn-field { width: 100%; height: 26px; padding: 0 8px; border: 0.5px solid rgba(0,0,0,.1); border-radius: 7px; background: rgba(255,255,255,.6); color: inherit; font: inherit; outline: none; }
 .scn-field:focus { border-color: rgba(0,0,0,.25); background: rgba(255,255,255,.85); }
-.scn-btn { height: 26px; padding: 0 12px; border-radius: 7px; background: rgba(0,0,0,.78); color: #fff; font: inherit; font-weight: 500; cursor: pointer; text-align: left; }
+.scn-btn { min-height: 26px; padding: 4px 10px; border-radius: 7px; background: rgba(0,0,0,.78); color: #fff; font: inherit; font-weight: 500; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .scn-btn:hover { background: rgba(0,0,0,.88); }
 .scn-btn.secondary { background: rgba(0,0,0,.06); color: inherit; }
 .scn-btn.secondary:hover { background: rgba(0,0,0,.1); }
+.scn-intro { padding: 6px 10px; border-radius: 8px; background: rgba(0,0,0,.04); color: rgba(41,38,27,.78); font-size: 11px; line-height: 1.55; }
+.scn-intro b { color: #29261b; font-weight: 600; }
+.scn-badge { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; flex-shrink: 0; }
+.scn-badge.ai { background: rgba(72, 187, 120, .22); color: #1e7d4a; border: 0.5px solid rgba(72, 187, 120, .4); }
+.scn-btn .scn-badge.ai { background: rgba(120, 220, 160, .22); color: #c9f3d8; border-color: rgba(120, 220, 160, .35); }

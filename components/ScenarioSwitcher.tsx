@@ -2,33 +2,23 @@
 
 import * as React from "react";
 import { useDemoStore } from "@/lib/store";
-import type { AgentId, Stage, AbnormalKind } from "@/types";
-
-const STAGES: Stage[] = [
-  "welcome",
-  "lui",
-  "running",
-  "reflect",
-  "followup",
-  "final",
-  "handoff",
-  "writeback-done",
-];
-const ABNORMALS: AbnormalKind[] = ["none", "timeout", "patch", "partial", "budget"];
 
 /**
- * 场景跳转面板 — 替代原型里的 Tweaks 面板。
- * 默认关闭, 右下角 "场景" 按钮唤起。
+ * 演示场景导览 (面向评审 / 领导)
+ *
+ * 这是给评审方一个全场景速览, 点击任意条目跳到对应 UI 状态查看,
+ * 不是开发调试工具. 11 个场景里 5 个含 DeepSeek 实时调用, 标 [AI] 徽标.
+ *
+ * 默认关闭, 右下角 "演示导览" 按钮唤起.
  */
 export function ScenarioSwitcher() {
   const [open, setOpen] = React.useState(false);
-  const { state, set, openWriteback, resetFollowup } = useDemoStore();
-  const { agent, stage, abnormal } = state;
+  const { set, openWriteback, resetFollowup } = useDemoStore();
 
   if (!open) {
     return (
-      <button className="scn-fab" onClick={() => setOpen(true)} aria-label="场景跳转">
-        场景
+      <button className="scn-fab" onClick={() => setOpen(true)} aria-label="演示导览">
+        演示导览
       </button>
     );
   }
@@ -36,90 +26,58 @@ export function ScenarioSwitcher() {
   return (
     <div className="scn-panel">
       <div className="scn-hd">
-        <b>场景跳转</b>
+        <b>演示场景导览</b>
         <button className="scn-x" onClick={() => setOpen(false)} aria-label="关闭">
           ✕
         </button>
       </div>
       <div className="scn-body">
-        <div className="scn-sect">场景</div>
-
-        <div className="scn-row">
-          <div className="scn-lbl">Agent</div>
-          <select
-            className="scn-field"
-            value={agent}
-            onChange={(e) => set({ agent: e.target.value as AgentId })}
-          >
-            <option value="a1">a1 · 智能风险排序</option>
-            <option value="a2">a2 · 智能风险排查比对</option>
-          </select>
+        <div className="scn-intro">
+          v1 demo 覆盖 <b>11 个场景</b>, 其中 <b>5 个</b> 接通 DeepSeek 实时调用 (标
+          <span className="scn-badge ai" style={{ marginLeft: 4 }}>
+            AI
+          </span>
+          ). 点击查看对应 UI / AI 输出。
         </div>
 
-        <div className="scn-row">
-          <div className="scn-lbl">阶段</div>
-          <select
-            className="scn-field"
-            value={stage}
-            onChange={(e) => set({ stage: e.target.value as Stage })}
-          >
-            {STAGES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="scn-row">
-          <div className="scn-lbl">异常路径</div>
-          <select
-            className="scn-field"
-            value={abnormal}
-            onChange={(e) => set({ abnormal: e.target.value as AbnormalKind })}
-          >
-            {ABNORMALS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="scn-sect">快速场景</div>
+        <div className="scn-sect">主流程</div>
 
         <button
           className="scn-btn"
           onClick={() => set({ agent: "a1", stage: "welcome", abnormal: "none" })}
         >
-          ① 空主界面
+          <span>① 空主界面</span>
         </button>
         <button
           className="scn-btn"
           onClick={() => set({ agent: "a1", stage: "lui", abnormal: "none" })}
         >
-          ② A1 LUI 参数填写
+          <span>② A1 LUI 参数填写</span>
+          <span className="scn-badge ai">AI 抽参</span>
         </button>
         <button
           className="scn-btn"
           onClick={() => set({ agent: "a1", stage: "running", abnormal: "none" })}
         >
-          ③ A1 工作流推进中
+          <span>③ A1 工作流推进中</span>
         </button>
         <button
           className="scn-btn"
           onClick={() => set({ agent: "a1", stage: "final", abnormal: "none" })}
         >
-          ④ A1 排序结果
+          <span>④ A1 排序结果</span>
+          <span className="scn-badge ai">AI × 2</span>
         </button>
         <button className="scn-btn" onClick={resetFollowup}>
-          ⑤ A2 LUI 反问
+          <span>⑤ A2 LUI 反问</span>
+          <span className="scn-badge ai">AI 相似度</span>
         </button>
         <button
           className="scn-btn"
           onClick={() => set({ agent: "a2", stage: "final", abnormal: "none" })}
         >
-          ⑥ A2 比对结果
+          <span>⑥ A2 比对结果</span>
+          <span className="scn-badge ai">AI × 2</span>
         </button>
 
         <div className="scn-sect">异常 / 边界</div>
@@ -128,13 +86,13 @@ export function ScenarioSwitcher() {
           className="scn-btn secondary"
           onClick={() => set({ agent: "a2", stage: "final", abnormal: "partial" })}
         >
-          ⑦ partial 异常 (写回置灰)
+          <span>⑦ partial 异常 (写回置灰)</span>
         </button>
         <button
           className="scn-btn secondary"
           onClick={() => set({ agent: "a2", stage: "final", abnormal: "patch" })}
         >
-          ⑧ 补丁库不可用
+          <span>⑧ 补丁库不可用</span>
         </button>
         <button
           className="scn-btn secondary"
@@ -160,7 +118,7 @@ export function ScenarioSwitcher() {
             })
           }
         >
-          ⑨ A1 → A2 串联桥
+          <span>⑨ A1 → A2 串联桥</span>
         </button>
         <button
           className="scn-btn secondary"
@@ -169,13 +127,13 @@ export function ScenarioSwitcher() {
             openWriteback();
           }}
         >
-          ⑩ 写回确认弹窗
+          <span>⑩ 写回确认弹窗</span>
         </button>
         <button
           className="scn-btn secondary"
           onClick={() => set({ agent: "a2", stage: "writeback-done", abnormal: "none" })}
         >
-          ⑪ 写回成功态
+          <span>⑪ 写回成功态</span>
         </button>
       </div>
     </div>
