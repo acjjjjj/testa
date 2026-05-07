@@ -36,16 +36,24 @@ export function BottomComposer({ stage, agent, onPickAgent, onSubmitQuery }: Bot
     }
   };
 
+  // 引用资产: 在预设资产里按顺序循环切换 (而不是堆叠插入)
+  const ASSET_REFS = [
+    "@order-svc-prod-07 (10.42.18.7)",
+    "@edge-gw-bj-03 (10.42.2.21)",
+    "@crm-web-04 (172.20.4.18)",
+    "@k8s-node-prod-12 (10.42.5.31)",
+    "@jumphost-sh-01 (10.42.0.19)",
+    "@cicd-jenkins-bj-02 (10.42.40.28)",
+  ];
+  const refIdxRef = React.useRef(0);
   const insertAssetRef = () => {
-    // 简易 "引用资产" — 把示例资产追加到 query 末尾
-    const refs = [
-      "@order-svc-prod-07 (10.42.18.7)",
-      "@edge-gw-bj-03 (10.42.2.21)",
-      "@crm-web-04 (172.20.4.18)",
-      "@k8s-node-prod-12 (10.42.5.31)",
-    ];
-    const pick = refs[Math.floor(Math.random() * refs.length)];
-    setText((t) => (t.trim() ? t + " " + pick : "排序 " + pick + " 上的高危漏洞"));
+    const next = ASSET_REFS[refIdxRef.current % ASSET_REFS.length];
+    refIdxRef.current += 1;
+    // 把已有的 @ref 全替换掉, 只留最新一条; 保持文字主体不变
+    setText((t) => {
+      const stripped = t.replace(/@[\w-]+ \([^)]+\)/g, "").replace(/\s{2,}/g, " ").trim();
+      return stripped ? `${stripped} ${next}` : `排序 ${next} 上的高危漏洞`;
+    });
   };
 
   const canSend = text.trim().length > 0;

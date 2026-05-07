@@ -22,18 +22,58 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
   const isAi = ai?.source === "ai";
   const confidence = ai?.confidence ?? 0.84;
 
-  const assetScope = ai?.assetScope ?? "运营商核心业务线";
-  const assetCount = ai?.assetCount ?? 142;
+  const initialAssetScope = ai?.assetScope ?? "运营商核心业务线";
+  const initialAssetCount = ai?.assetCount ?? 142;
   const initialSeverity = ai?.severity ?? "高危";
-  const timeWindow = ai?.timeWindow ?? "业务上线前 7 天";
+  const initialTimeWindow = ai?.timeWindow ?? "业务上线前 7 天";
   const businessTag = ai?.businessTag ?? "重要业务上线";
   const sceneWeight = ai?.sceneWeight ?? 1.15;
 
   const [severity, setSeverity] = React.useState<string>(initialSeverity);
+  const [assetScope, setAssetScope] = React.useState<string>(initialAssetScope);
+  const [assetCount, setAssetCount] = React.useState<number>(initialAssetCount);
+  const [timeWindow, setTimeWindow] = React.useState<string>(initialTimeWindow);
+
   // AI 重新抽取后, 同步本地选中
   React.useEffect(() => {
     if (ai?.severity) setSeverity(ai.severity);
   }, [ai?.severity]);
+  React.useEffect(() => {
+    if (ai?.assetScope) setAssetScope(ai.assetScope);
+    if (typeof ai?.assetCount === "number") setAssetCount(ai.assetCount);
+  }, [ai?.assetScope, ai?.assetCount]);
+  React.useEffect(() => {
+    if (ai?.timeWindow) setTimeWindow(ai.timeWindow);
+  }, [ai?.timeWindow]);
+
+  // 点击资产范围 → 在预设里循环切换
+  const ASSET_OPTIONS: Array<{ scope: string; count: number }> = [
+    { scope: "运营商核心业务线", count: 142 },
+    { scope: "订单中心业务线", count: 64 },
+    { scope: "运营商 Web 资产组", count: 86 },
+    { scope: "10.42.0.0/16 网段", count: 218 },
+    { scope: "组织结构 A · 边缘", count: 32 },
+  ];
+  const cycleAssetScope = () => {
+    const idx = ASSET_OPTIONS.findIndex((o) => o.scope === assetScope);
+    const next = ASSET_OPTIONS[(idx + 1) % ASSET_OPTIONS.length];
+    setAssetScope(next.scope);
+    setAssetCount(next.count);
+  };
+
+  // 点击时间窗口 → 在预设里循环切换
+  const TIME_OPTIONS = [
+    "业务上线前 7 天",
+    "业务上线前 14 天",
+    "近 7 天",
+    "近 30 天",
+    "近 90 天",
+    "实时",
+  ];
+  const cycleTimeWindow = () => {
+    const idx = TIME_OPTIONS.indexOf(timeWindow);
+    setTimeWindow(TIME_OPTIONS[(idx + 1) % TIME_OPTIONS.length]);
+  };
 
   const sourceBadge = isLoading ? (
     <Badge tone="amber">AI 解析中…</Badge>
@@ -79,13 +119,19 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
                   <span>资产范围</span>
                   <span className="req">必填</span>
                 </div>
-                <div className="ctrl">
+                <button
+                  className="ctrl"
+                  type="button"
+                  onClick={cycleAssetScope}
+                  title="点击切换 (mock 预设)"
+                  style={ctrlBtnStyle}
+                >
                   <span>
                     <b>{assetScope}</b> · 关联 {assetCount} 资产
                   </span>
                   <Icon name="caret" size={12} />
-                </div>
-                <div className="hint">支持业务线 / 资产组 / 单资产 / IP 段</div>
+                </button>
+                <div className="hint">支持业务线 / 资产组 / 单资产 / IP 段 (点击切换)</div>
               </div>
               <div className="field">
                 <div className="lb">
@@ -100,11 +146,17 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
                   <span>时间窗口</span>
                   <span className="dim2">可选</span>
                 </div>
-                <div className="ctrl">
+                <button
+                  className="ctrl"
+                  type="button"
+                  onClick={cycleTimeWindow}
+                  title="点击切换 (mock 预设)"
+                  style={ctrlBtnStyle}
+                >
                   <span>{timeWindow}</span>
                   <Icon name="caret" size={12} />
-                </div>
-                <div className="hint">未填默认近 30 天</div>
+                </button>
+                <div className="hint">未填默认近 30 天 (点击切换)</div>
               </div>
               <div className="field">
                 <div className="lb">
@@ -148,3 +200,11 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
     </div>
   );
 }
+
+// 把 .ctrl 这种纯展示 div 变成可点击 button 时复用 (CSS 类已经管样式, 只需要重置 <button> 默认值)
+const ctrlBtnStyle: React.CSSProperties = {
+  width: "100%",
+  font: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};

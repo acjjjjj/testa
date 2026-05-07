@@ -11,19 +11,28 @@ import { BottomComposer } from "./BottomComposer";
 import { WorkflowStatus } from "./WorkflowStatus";
 import { WritebackConfirmDialog } from "./WritebackConfirmDialog";
 import { ScenarioSwitcher } from "./ScenarioSwitcher";
+import { HISTORY } from "@/data/assets.mock";
 
 /** 主壳子 — 4 列网格: Rail | Sidebar | Main | RightPane */
 export function AppShell() {
-  const { state, setStage, set, startWithQuery, resetSession } = useDemoStore();
+  const { state, set, startWithQuery, resetSession } = useDemoStore();
   const { stage, agent } = state;
   const showRight = showsRightPane(stage);
+
+  // 点击侧边栏历史对话: 用其标题作为 query 重放整个 agent 流程 (含真 AI 抽参)
+  const replayHistory = (id: string) => {
+    const item = HISTORY.find((h) => h.id === id);
+    if (!item) return;
+    const targetAgent = item.tag === "比对" ? "a2" : "a1";
+    startWithQuery(item.t, targetAgent);
+  };
 
   return (
     <div className={`app-shell ${showRight ? "" : "no-rail"}`}>
       <Rail />
       <Sidebar
         activeId={stage === "welcome" ? null : "h1"}
-        onPick={() => setStage("final")}
+        onPick={replayHistory}
         onNew={resetSession}
       />
       <main style={mainStyle}>

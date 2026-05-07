@@ -21,21 +21,42 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
   const isAi = ai?.source === "ai";
   const confidence = ai?.confidence ?? 0.91;
 
-  const assetScope = ai?.assetScope ?? "组织结构 / 订单中心";
-  const assetCount = ai?.assetCount ?? 64;
+  const initialAssetScope = ai?.assetScope ?? "组织结构 / 订单中心";
+  const initialAssetCount = ai?.assetCount ?? 64;
   const dataSourcesArr = ai?.dataSources ?? ["内部漏洞库", "威胁情报", "CVE"];
   const dataSourcesText = dataSourcesArr.join(" + ");
   const initialDim = ai?.compareDims?.[0] ?? "cpe";
   const initialPatch = ai?.withPatch === false ? "否" : "是";
 
+  const [assetScope, setAssetScope] = React.useState(initialAssetScope);
+  const [assetCount, setAssetCount] = React.useState<number>(initialAssetCount);
   const [dim, setDim] = React.useState(initialDim);
   const [usePatch, setUsePatch] = React.useState(initialPatch);
+  React.useEffect(() => {
+    if (ai?.assetScope) setAssetScope(ai.assetScope);
+    if (typeof ai?.assetCount === "number") setAssetCount(ai.assetCount);
+  }, [ai?.assetScope, ai?.assetCount]);
   React.useEffect(() => {
     if (ai?.compareDims?.[0]) setDim(ai.compareDims[0]);
   }, [ai?.compareDims]);
   React.useEffect(() => {
     if (typeof ai?.withPatch === "boolean") setUsePatch(ai.withPatch ? "是" : "否");
   }, [ai?.withPatch]);
+
+  // 点击资产范围 → 在 A2 预设里循环切换 (含单资产 + IP 段, 跟 A1 不太一样)
+  const ASSET_OPTIONS_A2: Array<{ scope: string; count: number }> = [
+    { scope: "组织结构 / 订单中心", count: 64 },
+    { scope: "192.168.1.1", count: 1 },
+    { scope: "10.42.18.0/24 网段", count: 32 },
+    { scope: "运营商 web 资产组", count: 86 },
+    { scope: "运营商核心业务线", count: 142 },
+  ];
+  const cycleAssetScope = () => {
+    const idx = ASSET_OPTIONS_A2.findIndex((o) => o.scope === assetScope);
+    const next = ASSET_OPTIONS_A2[(idx + 1) % ASSET_OPTIONS_A2.length];
+    setAssetScope(next.scope);
+    setAssetCount(next.count);
+  };
 
   const sourceBadge = isLoading ? (
     <Badge tone="amber">AI 解析中…</Badge>
@@ -79,13 +100,19 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                   <span>资产范围</span>
                   <span className="req">必填</span>
                 </div>
-                <div className="ctrl">
+                <button
+                  className="ctrl"
+                  type="button"
+                  onClick={cycleAssetScope}
+                  title="点击切换 (mock 预设)"
+                  style={ctrlBtnStyle}
+                >
                   <span>
                     <b>{assetScope}</b> · 关联 {assetCount} 资产
                   </span>
                   <Icon name="caret" size={12} />
-                </div>
-                <div className="hint">192.168.1.1 等明确单资产将自动展开</div>
+                </button>
+                <div className="hint">192.168.1.1 等明确单资产将自动展开 (点击切换)</div>
               </div>
               <div className="field">
                 <div className="lb">
@@ -137,3 +164,10 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
     </div>
   );
 }
+
+const ctrlBtnStyle: React.CSSProperties = {
+  width: "100%",
+  font: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
