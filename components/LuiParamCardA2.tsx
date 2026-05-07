@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
 import { Seg } from "./Seg";
+import { Dropdown } from "./Dropdown";
 import { useDemoStore } from "@/lib/store";
 
 export interface LuiParamCardA2Props {
@@ -43,17 +44,17 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
     if (typeof ai?.withPatch === "boolean") setUsePatch(ai.withPatch ? "是" : "否");
   }, [ai?.withPatch]);
 
-  // 点击资产范围 → 在 A2 预设里循环切换 (含单资产 + IP 段, 跟 A1 不太一样)
-  const ASSET_OPTIONS_A2: Array<{ scope: string; count: number }> = [
-    { scope: "组织结构 / 订单中心", count: 64 },
-    { scope: "192.168.1.1", count: 1 },
-    { scope: "10.42.18.0/24 网段", count: 32 },
-    { scope: "运营商 web 资产组", count: 86 },
-    { scope: "运营商核心业务线", count: 142 },
+  // 资产范围候选 (A2 比 A1 多了 单资产 / IP 段)
+  const ASSET_OPTIONS_A2: Array<{ scope: string; count: number; hint: string }> = [
+    { scope: "组织结构 / 订单中心", count: 64, hint: "组织 · 64 资产" },
+    { scope: "192.168.1.1", count: 1, hint: "单资产 · 1" },
+    { scope: "10.42.18.0/24 网段", count: 32, hint: "IP 段 · 32 资产" },
+    { scope: "运营商 web 资产组", count: 86, hint: "资产组 · 86 资产" },
+    { scope: "运营商核心业务线", count: 142, hint: "业务线 · 142 资产" },
   ];
-  const cycleAssetScope = () => {
-    const idx = ASSET_OPTIONS_A2.findIndex((o) => o.scope === assetScope);
-    const next = ASSET_OPTIONS_A2[(idx + 1) % ASSET_OPTIONS_A2.length];
+  const pickAssetScope = (v: string) => {
+    const next = ASSET_OPTIONS_A2.find((o) => o.scope === v);
+    if (!next) return;
     setAssetScope(next.scope);
     setAssetCount(next.count);
   };
@@ -100,19 +101,24 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                   <span>资产范围</span>
                   <span className="req">必填</span>
                 </div>
-                <button
-                  className="ctrl"
-                  type="button"
-                  onClick={cycleAssetScope}
-                  title="点击切换 (mock 预设)"
-                  style={ctrlBtnStyle}
+                <Dropdown
+                  triggerClassName="ctrl"
+                  triggerStyle={ctrlBtnStyle}
+                  title="切换资产范围"
+                  value={assetScope}
+                  onPick={pickAssetScope}
+                  options={ASSET_OPTIONS_A2.map((o) => ({
+                    label: o.scope,
+                    hint: o.hint,
+                    value: o.scope,
+                  }))}
                 >
                   <span>
                     <b>{assetScope}</b> · 关联 {assetCount} 资产
                   </span>
                   <Icon name="caret" size={12} />
-                </button>
-                <div className="hint">192.168.1.1 等明确单资产将自动展开 (点击切换)</div>
+                </Dropdown>
+                <div className="hint">192.168.1.1 等明确单资产将自动展开</div>
               </div>
               <div className="field">
                 <div className="lb">

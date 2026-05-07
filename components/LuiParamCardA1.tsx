@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
 import { Seg } from "./Seg";
+import { Dropdown } from "./Dropdown";
 import { useDemoStore } from "@/lib/store";
 
 export interface LuiParamCardA1Props {
@@ -46,34 +47,30 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
     if (ai?.timeWindow) setTimeWindow(ai.timeWindow);
   }, [ai?.timeWindow]);
 
-  // 点击资产范围 → 在预设里循环切换
-  const ASSET_OPTIONS: Array<{ scope: string; count: number }> = [
-    { scope: "运营商核心业务线", count: 142 },
-    { scope: "订单中心业务线", count: 64 },
-    { scope: "运营商 Web 资产组", count: 86 },
-    { scope: "10.42.0.0/16 网段", count: 218 },
-    { scope: "组织结构 A · 边缘", count: 32 },
+  // 资产范围 候选
+  const ASSET_OPTIONS: Array<{ scope: string; count: number; hint?: string }> = [
+    { scope: "运营商核心业务线", count: 142, hint: "业务线 · 142 资产" },
+    { scope: "订单中心业务线", count: 64, hint: "业务线 · 64 资产" },
+    { scope: "运营商 Web 资产组", count: 86, hint: "资产组 · 86 资产" },
+    { scope: "10.42.0.0/16 网段", count: 218, hint: "IP 段 · 218 资产" },
+    { scope: "组织结构 A · 边缘", count: 32, hint: "组织 · 32 资产" },
   ];
-  const cycleAssetScope = () => {
-    const idx = ASSET_OPTIONS.findIndex((o) => o.scope === assetScope);
-    const next = ASSET_OPTIONS[(idx + 1) % ASSET_OPTIONS.length];
+  const pickAssetScope = (v: string) => {
+    const next = ASSET_OPTIONS.find((o) => o.scope === v);
+    if (!next) return;
     setAssetScope(next.scope);
     setAssetCount(next.count);
   };
 
-  // 点击时间窗口 → 在预设里循环切换
-  const TIME_OPTIONS = [
-    "业务上线前 7 天",
-    "业务上线前 14 天",
-    "近 7 天",
-    "近 30 天",
-    "近 90 天",
-    "实时",
+  // 时间窗口 候选
+  const TIME_OPTIONS: Array<{ label: string; hint?: string }> = [
+    { label: "业务上线前 7 天", hint: "上线前重点窗口" },
+    { label: "业务上线前 14 天", hint: "上线前扩展窗口" },
+    { label: "近 7 天", hint: "短期" },
+    { label: "近 30 天", hint: "默认" },
+    { label: "近 90 天", hint: "季度" },
+    { label: "实时", hint: "无时间限定" },
   ];
-  const cycleTimeWindow = () => {
-    const idx = TIME_OPTIONS.indexOf(timeWindow);
-    setTimeWindow(TIME_OPTIONS[(idx + 1) % TIME_OPTIONS.length]);
-  };
 
   const sourceBadge = isLoading ? (
     <Badge tone="amber">AI 解析中…</Badge>
@@ -119,19 +116,24 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
                   <span>资产范围</span>
                   <span className="req">必填</span>
                 </div>
-                <button
-                  className="ctrl"
-                  type="button"
-                  onClick={cycleAssetScope}
-                  title="点击切换 (mock 预设)"
-                  style={ctrlBtnStyle}
+                <Dropdown
+                  triggerClassName="ctrl"
+                  triggerStyle={ctrlBtnStyle}
+                  title="切换资产范围"
+                  value={assetScope}
+                  onPick={pickAssetScope}
+                  options={ASSET_OPTIONS.map((o) => ({
+                    label: o.scope,
+                    hint: o.hint,
+                    value: o.scope,
+                  }))}
                 >
                   <span>
                     <b>{assetScope}</b> · 关联 {assetCount} 资产
                   </span>
                   <Icon name="caret" size={12} />
-                </button>
-                <div className="hint">支持业务线 / 资产组 / 单资产 / IP 段 (点击切换)</div>
+                </Dropdown>
+                <div className="hint">支持业务线 / 资产组 / 单资产 / IP 段</div>
               </div>
               <div className="field">
                 <div className="lb">
@@ -146,17 +148,22 @@ export function LuiParamCardA1({ onSubmit, onCancel }: LuiParamCardA1Props) {
                   <span>时间窗口</span>
                   <span className="dim2">可选</span>
                 </div>
-                <button
-                  className="ctrl"
-                  type="button"
-                  onClick={cycleTimeWindow}
-                  title="点击切换 (mock 预设)"
-                  style={ctrlBtnStyle}
+                <Dropdown
+                  triggerClassName="ctrl"
+                  triggerStyle={ctrlBtnStyle}
+                  title="切换时间窗口"
+                  value={timeWindow}
+                  onPick={setTimeWindow}
+                  options={TIME_OPTIONS.map((o) => ({
+                    label: o.label,
+                    hint: o.hint,
+                    value: o.label,
+                  }))}
                 >
                   <span>{timeWindow}</span>
                   <Icon name="caret" size={12} />
-                </button>
-                <div className="hint">未填默认近 30 天 (点击切换)</div>
+                </Dropdown>
+                <div className="hint">未填默认近 30 天</div>
               </div>
               <div className="field">
                 <div className="lb">

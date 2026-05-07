@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Icon } from "./Icon";
+import { Dropdown } from "./Dropdown";
 import type { Stage, AgentId } from "@/types";
 
 export interface BottomComposerProps {
@@ -36,25 +37,24 @@ export function BottomComposer({ stage, agent, onPickAgent, onSubmitQuery }: Bot
     }
   };
 
-  // 引用资产: 在预设资产里按顺序循环切换 (而不是堆叠插入)
-  const ASSET_REFS = [
-    "@order-svc-prod-07 (10.42.18.7)",
-    "@edge-gw-bj-03 (10.42.2.21)",
-    "@crm-web-04 (172.20.4.18)",
-    "@k8s-node-prod-12 (10.42.5.31)",
-    "@jumphost-sh-01 (10.42.0.19)",
-    "@cicd-jenkins-bj-02 (10.42.40.28)",
+  // 引用资产候选 (mock 预设)
+  const ASSET_REFS: Array<{ ref: string; hint: string }> = [
+    { ref: "@order-svc-prod-07 (10.42.18.7)", hint: "订单服务 · 业务上线前重点" },
+    { ref: "@edge-gw-bj-03 (10.42.2.21)", hint: "边缘网关 · 公网暴露" },
+    { ref: "@crm-web-04 (172.20.4.18)", hint: "CRM Web · 重要业务系统" },
+    { ref: "@k8s-node-prod-12 (10.42.5.31)", hint: "Kubernetes 节点 · 生产" },
+    { ref: "@jumphost-sh-01 (10.42.0.19)", hint: "运维跳板机 · 红蓝对抗" },
+    { ref: "@cicd-jenkins-bj-02 (10.42.40.28)", hint: "Jenkins · 供应链审视" },
   ];
-  const refIdxRef = React.useRef(0);
-  const insertAssetRef = () => {
-    const next = ASSET_REFS[refIdxRef.current % ASSET_REFS.length];
-    refIdxRef.current += 1;
-    // 把已有的 @ref 全替换掉, 只留最新一条; 保持文字主体不变
+  // 选中一条资产 → 替换文本里的旧引用, 保持主体文字
+  const insertAssetRef = (next: string) => {
     setText((t) => {
       const stripped = t.replace(/@[\w-]+ \([^)]+\)/g, "").replace(/\s{2,}/g, " ").trim();
       return stripped ? `${stripped} ${next}` : `排序 ${next} 上的高危漏洞`;
     });
   };
+  // 当前文本里已经引用的资产 (用于在菜单里高亮)
+  const currentAssetRef = (text.match(/@[\w-]+ \([^)]+\)/) || [])[0] ?? "";
 
   const canSend = text.trim().length > 0;
 
@@ -71,9 +71,22 @@ export function BottomComposer({ stage, agent, onPickAgent, onSubmitQuery }: Bot
         />
         <div style={rowStyle}>
           <div style={leftToolsStyle}>
-            <button style={chipStyle} title="插入示例资产引用 (mock)" onClick={insertAssetRef}>
+            <Dropdown
+              triggerClassName=""
+              triggerStyle={chipStyle}
+              menuWidth={300}
+              placement="top"
+              title="选一个资产引用 (mock)"
+              value={currentAssetRef}
+              onPick={insertAssetRef}
+              options={ASSET_REFS.map((a) => ({
+                label: a.ref,
+                hint: a.hint,
+                value: a.ref,
+              }))}
+            >
               <Icon name="plus" size={12} /> 引用资产
-            </button>
+            </Dropdown>
             <button
               style={{ ...chipStyle, ...(agent === "a1" ? activeChipStyle : null) }}
               data-active={agent === "a1"}

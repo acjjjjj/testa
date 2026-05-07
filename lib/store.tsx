@@ -76,6 +76,8 @@ interface DemoState {
   userQuery: string;
   /** AI 解析后的 LUI 参数 */
   paramsState: ParamsState;
+  /** 侧边栏当前高亮的历史对话 id (null = 没选中, 显示首页) */
+  activeHistoryId: string | null;
 }
 
 type Action =
@@ -88,7 +90,7 @@ type Action =
   | { type: "handoff"; vuln: RankedVuln }
   | { type: "rankingState"; ranking: AiRankingState }
   | { type: "paramsState"; params: ParamsState }
-  | { type: "queryStart"; query: string; agent: AgentId }
+  | { type: "queryStart"; query: string; agent: AgentId; historyId?: string | null }
   | { type: "resetSession" };
 
 const askPairsCount = MERGE_PAIRS.filter((p) => p.action === "ask").length;
@@ -105,6 +107,7 @@ const initialState: DemoState = {
   aiRanking: { kind: "idle" },
   userQuery: "",
   paramsState: { kind: "idle" },
+  activeHistoryId: null,
 };
 
 function reducer(state: DemoState, action: Action): DemoState {
@@ -157,6 +160,8 @@ function reducer(state: DemoState, action: Action): DemoState {
         // 清掉之前的 AI 抽取 / 排序结果, 触发重新跑
         paramsState: { kind: "loading" },
         aiRanking: { kind: "idle" },
+        // 显式传 historyId (侧边栏点击) 才高亮; 底部输入框 / chip 启动 → 清空高亮
+        activeHistoryId: action.historyId ?? null,
       };
     case "resetSession":
       return {
@@ -169,6 +174,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         mergeAnswers: {},
         pendingIdx: 0,
         handoffVuln: null,
+        activeHistoryId: null,
       };
     default:
       return state;
@@ -187,8 +193,9 @@ interface DemoCtx {
   closeWriteback: () => void;
   writebackConfirm: () => void;
   handoffTo: (vuln: RankedVuln) => void;
-  /** 带 query 启动一个 agent: 推进 stage→lui + 后台调 /api/extract-params */
-  startWithQuery: (query: string, agent: AgentId) => void;
+  /** 带 query 启动一个 agent: 推进 stage→lui + 后台调 /api/extract-params
+   *  historyId 可选 — 由侧边栏点击重放时传入, 用于高亮当前历史项 */
+  startWithQuery: (query: string, agent: AgentId, historyId?: string | null) => void;
   /** 直接进 LUI (老路径, 没有用户 query) — 跳过 AI 参数抽取, 用默认值 */
   startAgent: (agent: AgentId) => void;
   /** 重置回欢迎页 */
@@ -297,10 +304,11 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "set", patch });
   }, []);
 
-  const startWithQuery = useCallback((query: string, agent: AgentId) => {
-    const trimmed = query.trim();
-    if (!trimmed) return;
-    dispatch({ type: "queryStart", query: trimmed, agent });
+  const startWithQuery = useCallback(
+    (query: string, agent: AgentId, historyId?: string | null) => {
+      const trimmed = query.trim();
+      if (!trimmed) return;
+      dispatch({ type: "queryStart", query: trimmed, agent, historyId });
 
     // 后台调 /api/extract-params 把 query → 结构化参数
     const ctrl = new AbortController();
@@ -328,7 +336,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: "paramsState", params: { kind: "error", reason } });
       })
       .finally(() => clearTimeout(timeoutId));
-  }, []);
+    },
+    []
+  );
 
   const startAgent = useCallback((agent: AgentId) => {
     // 走老路径: 不带 query, 直接进 LUI 卡, params 用默认 mock
