@@ -1,15 +1,56 @@
+"use client";
+
 import * as React from "react";
 import { NAV } from "@/data/assets.mock";
 import { Icon, type IconName } from "./Icon";
+import { useToast } from "./Toast";
+
+/** 每个模块的一句话 hint, click 后弹 toast 让用户知道这是干嘛 */
+const MODULE_HINTS: Record<string, string> = {
+  asset: "资产 — 资产清单 / 指纹 / CMDB 联动",
+  expose: "暴露面 — 互联网暴露资产实时盘点",
+  risk: "风险 — 漏洞 / 配置 / 弱口令汇总台账",
+  detect: "检测 — 周期性扫描 + 实时监测",
+  ticket: "工单 — 风险派单与处置流转",
+  report: "报告 — 合规 / 审计 / 红蓝对抗导出",
+  config: "配置 — 数据源 / 阈值 / 模型设置",
+  sentry: "哨兵 — 当前所在 AI 助手模块",
+};
 
 /** 鉴微 insight 主导航栏 — 哨兵 是第八项 */
 export function Rail() {
+  const toast = useToast();
+
+  const handleNav = (k: string, label: string, active?: boolean) => {
+    if (k === "sentry" && active) {
+      toast.show("你已在 哨兵 AI 助手 模块内", "info");
+      return;
+    }
+    const hint = MODULE_HINTS[k] ?? label;
+    toast.show(`${hint} · 不在本 v1.0 demo 范围, 完整功能请到 鉴微 insight 主台`, "info");
+  };
+
   return (
     <nav className="rail" style={railStyle}>
-      <div className="logo" style={logoStyle}>鉴</div>
+      <button
+        className="logo"
+        style={logoStyle}
+        title="鉴微 insight"
+        onClick={() =>
+          toast.show("鉴微 insight · 漏洞攻击面统一治理平台 · 本 demo 仅展示哨兵 AI 助手", "info")
+        }
+      >
+        鉴
+      </button>
       <div className="nav" style={navStyle}>
         {NAV.map((n) => (
-          <button key={n.k} className={n.active ? "active" : ""} title={n.l} style={navBtn(n.active)}>
+          <button
+            key={n.k}
+            className={n.active ? "active" : ""}
+            title={MODULE_HINTS[n.k] ?? n.l}
+            style={navBtn(n.active)}
+            onClick={() => handleNav(n.k, n.l, n.active)}
+          >
             <span className="ico">
               <Icon name={n.k as IconName} size={18} />
             </span>
@@ -17,7 +58,14 @@ export function Rail() {
         ))}
       </div>
       <div style={{ flex: 1 }} />
-      <div className="me" style={meStyle}>An</div>
+      <button
+        className="me"
+        style={meStyle}
+        title="An · 红队工程师 · 鉴微 insight 测试账号"
+        onClick={() => toast.show("An · 红队工程师 · 鉴微 insight 测试账号 (mock)", "info")}
+      >
+        An
+      </button>
     </nav>
   );
 }
@@ -44,6 +92,7 @@ const logoStyle: React.CSSProperties = {
   fontSize: 13,
   border: "1px solid var(--line-2)",
   marginBottom: 10,
+  cursor: "pointer",
 };
 
 const navStyle: React.CSSProperties = {
@@ -68,6 +117,7 @@ function navBtn(active?: boolean): React.CSSProperties {
     background: active ? "var(--bg-2)" : "transparent",
     boxShadow: active ? "inset 0 0 0 1px var(--line-2)" : undefined,
     cursor: "pointer",
+    border: 0,
   };
 }
 
@@ -81,4 +131,5 @@ const meStyle: React.CSSProperties = {
   fontSize: 11,
   color: "var(--fg-1)",
   border: "1px solid var(--line-2)",
+  cursor: "pointer",
 };
