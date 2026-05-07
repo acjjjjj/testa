@@ -15,6 +15,7 @@ import type {
   AbnormalKind,
   RankedVuln,
   MergeAnswer,
+  HistoryItem,
 } from "@/types";
 import { MERGE_PAIRS } from "@/data/compare.mock";
 import { A1_RANK_INPUT } from "@/data/vulnerabilities.mock";
@@ -78,6 +79,8 @@ interface DemoState {
   paramsState: ParamsState;
   /** 侧边栏当前高亮的历史对话 id (null = 没选中, 显示首页) */
   activeHistoryId: string | null;
+  /** 用户运行时新建的对话条目 (从底部输入框 / 示例 chip 启动的, 不含 mock HISTORY) */
+  dynamicHistory: HistoryItem[];
 }
 
 type Action =
@@ -108,6 +111,7 @@ const initialState: DemoState = {
   userQuery: "",
   paramsState: { kind: "idle" },
   activeHistoryId: null,
+  dynamicHistory: [],
 };
 
 function reducer(state: DemoState, action: Action): DemoState {
@@ -150,20 +154,45 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, aiRanking: action.ranking };
     case "paramsState":
       return { ...state, paramsState: action.params };
-    case "queryStart":
+    case "queryStart": {
+      // 没有 historyId = 用户从底部输入框 / 示例 chip 启动的新对话
+      // → 在 dynamicHistory 顶部插入一条新条目, activeHistoryId 指向它
+      const isReplay = action.historyId != null;
+      let nextDynamic = state.dynamicHistory;
+      let nextActiveId = action.historyId ?? null;
+      if (!isReplay) {
+        const newId = `dyn-${Date.now()}`;
+        // title 取 query 前 28 字 (UI 列表里太长会截断), 给现网/比对 query 一个干净的标题
+        const title = action.query.length > 28 ? action.query.slice(0, 28) + "…" : action.query;
+        const newItem: HistoryItem = {
+          id: newId,
+          t: title,
+          tag: action.agent === "a2" ? "比对" : "排序",
+          m: "刚刚",
+          live: true,
+        };
+        // 把上一个 live 条目 (如果有) 的 live 关掉
+        nextDynamic = [
+          newItem,
+          ...state.dynamicHistory.map((h) => (h.live ? { ...h, live: false } : h)),
+        ];
+        nextActiveId = newId;
+      }
       return {
         ...state,
         userQuery: action.query,
         agent: action.agent,
         stage: "lui",
         abnormal: "none",
-        // 清掉之前的 AI 抽取 / 排序结果, 触发重新跑
         paramsState: { kind: "loading" },
         aiRanking: { kind: "idle" },
-        // 显式传 historyId (侧边栏点击) 才高亮; 底部输入框 / chip 启动 → 清空高亮
-        activeHistoryId: action.historyId ?? null,
+        activeHistoryId: nextActiveId,
+        dynamicHistory: nextDynamic,
       };
+    }
     case "resetSession":
+      // "新对话": 清掉当前会话状态, 把上一个 live 条目沉淀成"已结束"
+      // (不清 dynamicHistory, 用户之前发起的对话历史保留)
       return {
         ...state,
         stage: "welcome",
@@ -175,6 +204,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         pendingIdx: 0,
         handoffVuln: null,
         activeHistoryId: null,
+        dynamicHistory: state.dynamicHistory.map((h) => (h.live ? { ...h, live: false } : h)),
       };
     default:
       return state;

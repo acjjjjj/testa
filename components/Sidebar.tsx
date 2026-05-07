@@ -2,16 +2,24 @@
 
 import * as React from "react";
 import { HISTORY } from "@/data/assets.mock";
+import type { HistoryItem } from "@/types";
 import { Icon } from "./Icon";
 
 export interface SidebarProps {
   activeId: string | null;
+  /** 用户运行时新建的对话条目 (会显示在 mock HISTORY 上方) */
+  dynamicHistory?: HistoryItem[];
   onPick: (id: string) => void;
   onNew: () => void;
 }
 
 /** 历史对话侧栏 */
-export function Sidebar({ activeId, onPick, onNew }: SidebarProps) {
+export function Sidebar({ activeId, dynamicHistory = [], onPick, onNew }: SidebarProps) {
+  // dynamic 在前 + mock HISTORY 在后, 都参与搜索 / 高亮 / 渲染
+  const allItems = React.useMemo(
+    () => [...dynamicHistory, ...HISTORY],
+    [dynamicHistory]
+  );
   return (
     <aside className="side-pane" style={asideStyle}>
       <div style={hdStyle}>
@@ -31,7 +39,7 @@ export function Sidebar({ activeId, onPick, onNew }: SidebarProps) {
       </div>
       <div style={groupStyle}>最近</div>
       <div style={listStyle}>
-        {HISTORY.map((c) => (
+        {allItems.map((c) => (
           <div
             key={c.id}
             className={`conv ${c.id === activeId ? "active" : ""}`}

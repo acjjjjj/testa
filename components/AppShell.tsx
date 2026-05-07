@@ -21,8 +21,9 @@ export function AppShell() {
 
   // 点击侧边栏历史对话: 用其标题作为 query 重放整个 agent 流程 (含真 AI 抽参)
   // 显式带上 historyId, store 会把它写进 activeHistoryId 让侧边栏高亮跟手
+  // 同时支持 dynamicHistory (用户运行时新建的) 和 mock HISTORY
   const replayHistory = (id: string) => {
-    const item = HISTORY.find((h) => h.id === id);
+    const item = state.dynamicHistory.find((h) => h.id === id) ?? HISTORY.find((h) => h.id === id);
     if (!item) return;
     const targetAgent = item.tag === "比对" ? "a2" : "a1";
     startWithQuery(item.t, targetAgent, id);
@@ -33,6 +34,7 @@ export function AppShell() {
       <Rail />
       <Sidebar
         activeId={state.activeHistoryId}
+        dynamicHistory={state.dynamicHistory}
         onPick={replayHistory}
         onNew={resetSession}
       />
