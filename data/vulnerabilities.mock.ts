@@ -13,3 +13,29 @@ export const VULNERABILITIES: Vulnerability[] = [
   { cve: "CVE-2024-23897", name: "Jenkins CLI 任意文件读取", severity: "high", desc: "CI 节点配置文件可被读取, 凭据外泄链路" },
   { cve: "CVE-2023-22515", name: "Confluence 权限提升", severity: "high", desc: "内部文档系统, 已存在 admin 账号创建利用" },
 ];
+
+/**
+ * Agent 1 真 AI 排序的输入候选 — 给 /api/rank 用
+ * 资产绑定按运营商核心业务场景规划
+ */
+export const A1_RANK_INPUT: Array<{
+  cve: string;
+  name: string;
+  severity: string;
+  desc: string;
+  asset: string;
+}> = VULNERABILITIES.map((v, i) => {
+  const assets = [
+    "order-svc-prod-07 / 10.42.18.7",
+    "edge-gw-bj-03 / 10.42.2.21",
+    "crm-web-04 / 172.20.4.18",
+    "k8s-node-prod-12 / 10.42.30.102",
+    "jumphost-sh-01 / 10.42.0.19",
+    "cicd-tc-prod-01 / 10.42.40.5",
+    "mq-cluster-04 / 10.42.6.40",
+    "gw-mft-02 / 172.20.18.9",
+    "cicd-jenkins-bj-02 / 10.42.40.28",
+    "wiki-conf-01 / 172.20.20.4",
+  ];
+  return { ...v, asset: assets[i] ?? "unknown-host / 0.0.0.0" };
+});

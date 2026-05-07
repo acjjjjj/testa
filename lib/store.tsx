@@ -17,7 +17,15 @@ import type {
   MergeAnswer,
 } from "@/types";
 import { MERGE_PAIRS } from "@/data/compare.mock";
+import { A1_RANK_INPUT } from "@/data/vulnerabilities.mock";
 import { LUI_FOLLOWUP_BUDGET } from "@/lib/scoring";
+
+/** A1 真 AI 排序的运行态 */
+export type AiRankingState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; source: "ai" | "mock"; model?: string; summary: string; ranked: RankedVuln[] }
+  | { kind: "error"; reason: string };
 
 interface DemoState {
   agent: AgentId;
@@ -33,6 +41,8 @@ interface DemoState {
   writebackOpen: boolean;
   /** A1 → A2 串联时引用的漏洞 */
   handoffVuln: RankedVuln | null;
+  /** A1 真 AI 排序结果 */
+  aiRanking: AiRankingState;
 }
 
 type Action =
@@ -42,7 +52,8 @@ type Action =
   | { type: "openWriteback" }
   | { type: "closeWriteback" }
   | { type: "writebackConfirm" }
-  | { type: "handoff"; vuln: RankedVuln };
+  | { type: "handoff"; vuln: RankedVuln }
+  | { type: "rankingState"; ranking: AiRankingState };
 
 const askPairsCount = MERGE_PAIRS.filter((p) => p.action === "ask").length;
 
@@ -55,6 +66,7 @@ const initialState: DemoState = {
   mergeAnswers: {},
   writebackOpen: false,
   handoffVuln: null,
+  aiRanking: { kind: "idle" },
 };
 
 function reducer(state: DemoState, action: Action): DemoState {
@@ -93,6 +105,8 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, writebackOpen: false, stage: "writeback-done" };
     case "handoff":
       return { ...state, handoffVuln: action.vuln, stage: "handoff" };
+    case "rankingState":
+      return { ...state, aiRanking: action.ranking };
     default:
       return state;
   }
@@ -129,6 +143,47 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     }, 2400);
     return () => clearTimeout(id);
   }, [state.stage]);
+
+  // A1 进入 running 时, 后台调真 AI 做排序; UI 在 final 阶段消费结果
+  useEffect(() => {
+    if (state.stage !== "running" || state.agent !== "a1") return;
+    let aborted = false;
+    dispatch({ type: "rankingState", ranking: { kind: "loading" } });
+    fetch("/api/rank", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario: "运营商核心业务 (业务上线前 + 红蓝对抗前)",
+        items: A1_RANK_INPUT,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d: { source: "ai" | "mock"; model?: string; summary?: string; ranked: RankedVuln[] }) => {
+        if (aborted) return;
+        if (!d.ranked || d.ranked.length === 0) {
+          dispatch({ type: "rankingState", ranking: { kind: "error", reason: "empty" } });
+          return;
+        }
+        dispatch({
+          type: "rankingState",
+          ranking: {
+            kind: "done",
+            source: d.source,
+            model: d.model,
+            summary: d.summary ?? "",
+            ranked: d.ranked,
+          },
+        });
+      })
+      .catch((err: unknown) => {
+        if (aborted) return;
+        const reason = err instanceof Error ? err.message : "unknown";
+        dispatch({ type: "rankingState", ranking: { kind: "error", reason } });
+      });
+    return () => {
+      aborted = true;
+    };
+  }, [state.stage, state.agent]);
 
   useEffect(() => {
     if (state.stage !== "reflect") return;
