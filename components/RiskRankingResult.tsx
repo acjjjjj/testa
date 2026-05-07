@@ -236,8 +236,9 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
           </button>
           <span className="sp" />
           <span className="meta">
-            结构校验通过 · 覆盖率 {ranked.length}/{ranked.length} · 一致性 0 容忍通过 ·
-            session mGqA-31f
+            结构校验通过 · 覆盖率 {totalCount}/{totalCount}
+            {isAi ? ` · 前 ${ranked.length} 条 AI 实时评分` : ""} · 一致性 0 容忍通过 · session
+            mGqA-31f
           </span>
         </div>
       </div>

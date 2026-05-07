@@ -50,14 +50,14 @@ export const A2_RUNNING_LOG: Array<{ ts: string; text: string; emphasize?: boole
 export const A1_TOOL_CALLS: WorkflowToolCall[] = [
   { tn: "insight.vulns.list", ar: "→ 142 条", rt: "1.8s" },
   { tn: "vpt.score.calc",     ar: "→ 142 × 3", rt: "0.7s" },
-  { tn: "wenjin.llm.infer",   ar: "→ 场景识别", rt: "0.9s" },
+  { tn: "deepseek.chat.infer",   ar: "→ 场景识别", rt: "0.9s" },
 ];
 export const A2_TOOL_CALLS: WorkflowToolCall[] = [
   { tn: "insight.assets.fingerprint", ar: "→ 64 资产", rt: "2.1s" },
   { tn: "insight.vulns.list",         ar: "→ 588 命中", rt: "1.5s" },
   { tn: "cve.match.bulk",             ar: "→ 482 候选对", rt: "3.4s" },
   { tn: "patch.cve.lookup",           ar: "→ 412 → 2 暂无 / 1 待发布", rt: "2.6s" },
-  { tn: "wenjin.llm.infer",           ar: "→ 相似度 × 482 对", rt: "7.2s" },
+  { tn: "deepseek.chat.infer",           ar: "→ 相似度 × 482 对", rt: "7.2s" },
 ];
 
 export function planningStepsFor(agent: AgentId) {
