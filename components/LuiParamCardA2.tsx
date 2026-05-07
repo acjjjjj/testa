@@ -33,6 +33,12 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
   const [assetCount, setAssetCount] = React.useState<number>(initialAssetCount);
   const [dim, setDim] = React.useState(initialDim);
   const [usePatch, setUsePatch] = React.useState(initialPatch);
+  // 数据源 (key 用 join("|") 做单值, 简化 Dropdown)
+  const [dataSourcesKey, setDataSourcesKey] = React.useState<string>(dataSourcesArr.join("|"));
+  React.useEffect(() => {
+    if (ai?.dataSources) setDataSourcesKey(ai.dataSources.join("|"));
+  }, [ai?.dataSources]);
+  const dataSourcesShown = dataSourcesKey.split("|");
   React.useEffect(() => {
     if (ai?.assetScope) setAssetScope(ai.assetScope);
     if (typeof ai?.assetCount === "number") setAssetCount(ai.assetCount);
@@ -57,6 +63,28 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
     if (!next) return;
     setAssetScope(next.scope);
     setAssetCount(next.count);
+  };
+
+  // 数据源候选 (常见组合, 替代多选 UI 的简化方案)
+  const DATASOURCE_OPTIONS: Array<{ label: string; hint: string; sources: string[] }> = [
+    { label: "内部漏洞库 + CVE", hint: "默认 · 2 / 4", sources: ["内部漏洞库", "CVE"] },
+    {
+      label: "内部漏洞库 + CVE + 威胁情报",
+      hint: "推荐 · 3 / 4",
+      sources: ["内部漏洞库", "CVE", "威胁情报"],
+    },
+    {
+      label: "全部 4 库",
+      hint: "完整覆盖 · 4 / 4",
+      sources: ["内部漏洞库", "CVE", "威胁情报", "CNNVD"],
+    },
+    { label: "仅内部库", hint: "最快 · 1 / 4", sources: ["内部漏洞库"] },
+    { label: "CVE + CNNVD", hint: "公开库 · 2 / 4", sources: ["CVE", "CNNVD"] },
+  ];
+  const pickDataSources = (v: string) => {
+    const opt = DATASOURCE_OPTIONS.find((o) => o.sources.join("|") === v);
+    if (!opt) return;
+    setDataSourcesKey(opt.sources.join("|"));
   };
 
   const sourceBadge = isLoading ? (
@@ -125,10 +153,21 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                   <span>数据源选择</span>
                   <span className="req">必填</span>
                 </div>
-                <div className="ctrl">
-                  <span>{dataSourcesText}</span>
-                  <span className="dim2 mono">{dataSourcesArr.length} / 4</span>
-                </div>
+                <Dropdown
+                  triggerClassName="ctrl"
+                  triggerStyle={ctrlBtnStyle}
+                  title="切换数据源组合"
+                  value={dataSourcesKey}
+                  onPick={pickDataSources}
+                  options={DATASOURCE_OPTIONS.map((o) => ({
+                    label: o.label,
+                    hint: o.hint,
+                    value: o.sources.join("|"),
+                  }))}
+                >
+                  <span>{dataSourcesShown.join(" + ")}</span>
+                  <span className="dim2 mono">{dataSourcesShown.length} / 4</span>
+                </Dropdown>
                 <div className="hint">v1 支持 内部 / 威胁情报 / CVE / CNNVD</div>
               </div>
               <div className="field">
