@@ -173,7 +173,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         scenario: "运营商核心业务 (业务上线前 + 红蓝对抗前)",
-        items: A1_RANK_INPUT,
+        // 只送前 5 条做真 AI 排序, 控制在 Vercel Edge 25s 内稳定完成
+        // (10 条平均 ~20s 容易卡 Vercel timeout)
+        items: A1_RANK_INPUT.slice(0, 5),
       }),
       signal: ctrl.signal,
     })

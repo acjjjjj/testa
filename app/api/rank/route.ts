@@ -123,10 +123,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         ],
         response_format: { type: "json_object" },
         temperature: 0.3,
-        max_tokens: 2200,
+        max_tokens: 1500,
       }),
-      // Vercel Hobby 上限 25s, 这里 18s 留 7s 给 mock fallback 序列化返回
-      signal: AbortSignal.timeout(18000),
+      // 22s upstream timeout, 留 3s 序列化兜底返回, Vercel Edge 25s 总预算内
+      signal: AbortSignal.timeout(22000),
     });
 
     if (!upstream.ok) {
