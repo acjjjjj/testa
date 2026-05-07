@@ -185,20 +185,45 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
             <div className="t">
               <Icon name="spark" size={13} />
               <span>后续动作建议</span>
+              {(() => {
+                const na = state.nextActions;
+                if (na.kind === "loading") return <Badge tone="amber">DeepSeek 生成中…</Badge>;
+                if (na.kind === "done" && na.source === "ai") return <Badge tone="mint">AI 实时建议</Badge>;
+                if (na.kind === "done" && na.source === "mock") return <Badge tone="amber">mock 兜底</Badge>;
+                if (na.kind === "error") return <Badge tone="amber">mock 兜底</Badge>;
+                return null;
+              })()}
             </div>
             <div className="m">
-              <span className="dim2">{A1_NEXT_ACTIONS.length} 条</span>
+              <span className="dim2">
+                {(() => {
+                  const na = state.nextActions;
+                  const list = na.kind === "done" ? na.actions : A1_NEXT_ACTIONS;
+                  return `${list.length} 条`;
+                })()}
+              </span>
             </div>
           </div>
           <div
             className="cb"
             style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12.5 }}
           >
-            {A1_NEXT_ACTIONS.map((a, i) => (
-              <div key={i}>
-                {i === 0 ? "①" : i === 1 ? "②" : "③"} {a}
-              </div>
-            ))}
+            {(() => {
+              const na = state.nextActions;
+              if (na.kind === "loading") {
+                return (
+                  <div style={{ color: "var(--fg-3)", fontStyle: "italic" }}>
+                    正在调用 DeepSeek 基于本次排序结果生成针对性建议…
+                  </div>
+                );
+              }
+              const list = na.kind === "done" ? na.actions : A1_NEXT_ACTIONS;
+              return list.map((a, i) => (
+                <div key={i}>
+                  {i === 0 ? "①" : i === 1 ? "②" : "③"} {a}
+                </div>
+              ));
+            })()}
           </div>
         </div>
 

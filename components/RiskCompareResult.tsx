@@ -16,6 +16,17 @@ export interface RiskCompareResultProps {
 export function RiskCompareResult({ partial, onWriteback }: RiskCompareResultProps) {
   const { state } = useDemoStore();
   const writebackDisabled = !!partial;
+  const cs = state.compareSummary;
+  const csIsAi = cs.kind === "done" && cs.source === "ai";
+  const csIsLoading = cs.kind === "loading";
+
+  const summaryBadge = csIsLoading ? (
+    <Badge tone="amber">DeepSeek 生成中…</Badge>
+  ) : csIsAi ? (
+    <Badge tone="mint">AI 实时汇总</Badge>
+  ) : cs.kind === "done" || cs.kind === "error" ? (
+    <Badge tone="amber">mock 兜底</Badge>
+  ) : null;
 
   return (
     <div className="msg agent a2">
@@ -24,14 +35,25 @@ export function RiskCompareResult({ partial, onWriteback }: RiskCompareResultPro
         <div className="who">
           <b>智能风险排查比对</b>
           <Badge tone="mint">已完成</Badge>
+          {summaryBadge}
           <span className="dim2">
-            耗时 48.7s · {A2_ASSET_COUNT} 资产全部覆盖 · 反问 {state.mergesConfirmed} 轮
+            {A2_ASSET_COUNT} 资产全部覆盖 · 反问 {state.mergesConfirmed} 轮
           </span>
         </div>
         <div className="text">
-          已对 <b>组织结构 · 订单中心</b> 下 <b>{A2_ASSET_COUNT}</b> 个资产完成多源漏洞清洗合并, 共归集
-          <b> {A2_TOTAL_RAW} </b>条原始漏洞数据, 去重后 <b>{COMPARE_STATS.added}</b> 条首次命中,{" "}
-          <b>{COMPARE_STATS.merged}</b> 条合并记录。
+          {csIsLoading ? (
+            <span style={{ color: "var(--fg-3)", fontStyle: "italic" }}>
+              正在调用 DeepSeek 生成比对结果汇总与反思校验报告…
+            </span>
+          ) : cs.kind === "done" ? (
+            cs.summary
+          ) : (
+            <>
+              已对 <b>组织结构 · 订单中心</b> 下 <b>{A2_ASSET_COUNT}</b> 个资产完成多源漏洞清洗合并,
+              共归集 <b> {A2_TOTAL_RAW} </b>条原始漏洞数据, 去重后{" "}
+              <b>{COMPARE_STATS.added}</b> 条首次命中, <b>{COMPARE_STATS.merged}</b> 条合并记录。
+            </>
+          )}
         </div>
 
         <div className="card">
@@ -225,7 +247,9 @@ export function RiskCompareResult({ partial, onWriteback }: RiskCompareResultPro
           </button>
           <span className="sp" />
           <span className="meta">
-            {writebackDisabled
+            {cs.kind === "done"
+              ? cs.reflection
+              : writebackDisabled
               ? "partial = true · 补丁库不可用 · 仅允许导出 CSV"
               : "写回鉴微 insight · 7 字段映射 · partial = false"}
           </span>

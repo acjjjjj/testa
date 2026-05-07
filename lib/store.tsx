@@ -36,6 +36,20 @@ export type AiRankingState =
     }
   | { kind: "error"; reason: string };
 
+/** A1 后续动作建议 (3 条) 的运行态 */
+export type NextActionsState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; source: "ai" | "mock"; actions: string[] }
+  | { kind: "error"; reason: string };
+
+/** A2 比对汇总段落 + reflection 报告的运行态 */
+export type CompareSummaryState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; source: "ai" | "mock"; summary: string; reflection: string }
+  | { kind: "error"; reason: string };
+
 /** LUI 参数智能抽取 (A1 / A2 共用) 的运行态 */
 export type ExtractedParams = {
   source: "ai" | "mock";
@@ -73,6 +87,10 @@ interface DemoState {
   handoffVuln: RankedVuln | null;
   /** A1 真 AI 排序结果 */
   aiRanking: AiRankingState;
+  /** A1 真 AI 后续动作建议 (排序完后异步生成) */
+  nextActions: NextActionsState;
+  /** A2 真 AI 比对汇总 + reflection (final 阶段异步生成) */
+  compareSummary: CompareSummaryState;
   /** 用户在底部输入框 / 示例 chip 输入的原始 query */
   userQuery: string;
   /** AI 解析后的 LUI 参数 */
@@ -92,6 +110,8 @@ type Action =
   | { type: "writebackConfirm" }
   | { type: "handoff"; vuln: RankedVuln }
   | { type: "rankingState"; ranking: AiRankingState }
+  | { type: "nextActionsState"; nextActions: NextActionsState }
+  | { type: "compareSummaryState"; compareSummary: CompareSummaryState }
   | { type: "paramsState"; params: ParamsState }
   | { type: "queryStart"; query: string; agent: AgentId; historyId?: string | null }
   | { type: "resetSession" };
@@ -108,6 +128,8 @@ const initialState: DemoState = {
   writebackOpen: false,
   handoffVuln: null,
   aiRanking: { kind: "idle" },
+  nextActions: { kind: "idle" },
+  compareSummary: { kind: "idle" },
   userQuery: "",
   paramsState: { kind: "idle" },
   activeHistoryId: null,
@@ -152,6 +174,10 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, handoffVuln: action.vuln, stage: "handoff" };
     case "rankingState":
       return { ...state, aiRanking: action.ranking };
+    case "nextActionsState":
+      return { ...state, nextActions: action.nextActions };
+    case "compareSummaryState":
+      return { ...state, compareSummary: action.compareSummary };
     case "paramsState":
       return { ...state, paramsState: action.params };
     case "queryStart": {
@@ -186,6 +212,8 @@ function reducer(state: DemoState, action: Action): DemoState {
         abnormal: "none",
         paramsState: { kind: "loading" },
         aiRanking: { kind: "idle" },
+        nextActions: { kind: "idle" },
+        compareSummary: { kind: "idle" },
         activeHistoryId: nextActiveId,
         dynamicHistory: nextDynamic,
       };
@@ -200,6 +228,8 @@ function reducer(state: DemoState, action: Action): DemoState {
         userQuery: "",
         paramsState: { kind: "idle" },
         aiRanking: { kind: "idle" },
+        nextActions: { kind: "idle" },
+        compareSummary: { kind: "idle" },
         mergeAnswers: {},
         pendingIdx: 0,
         handoffVuln: null,
@@ -318,6 +348,127 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     // 注意: 这里不返回 cleanup 函数, 让 fetch 跑完它自己的生命周期 (28s 超时 / 完成 / 失败)
     // 即使 stage 推进到 reflect/final, 这个请求也继续在背后跑
   }, [state.stage, state.agent, state.aiRanking.kind]);
+
+  // A1 排序完成 → 后台调 /api/next-actions 拿 3 条针对性建议
+  // 触发条件: aiRanking.kind 转成 done 后 (不管 source 是 ai 还是 mock 都要)
+  useEffect(() => {
+    if (state.aiRanking.kind !== "done") return;
+    if (state.nextActions.kind === "loading" || state.nextActions.kind === "done") return;
+
+    const top = state.aiRanking.ranked.slice(0, 5).map((r) => ({
+      cve: r.cve,
+      name: r.name,
+      vptA: r.vptA,
+      vptV: r.vptV,
+      vptI: r.vptI,
+      score: r.score,
+      sceneTag: r.sceneTag,
+      desc: r.desc,
+    }));
+
+    dispatch({ type: "nextActionsState", nextActions: { kind: "loading" } });
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 18000);
+
+    fetch("/api/next-actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario: "运营商核心业务 (业务上线前 + 红蓝对抗前)",
+        ranked: top,
+      }),
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return (await r.json()) as { source: "ai" | "mock"; actions: string[] };
+      })
+      .then((d) => {
+        // eslint-disable-next-line no-console
+        console.log(`[next-actions] ${d.source} ok, ${d.actions?.length ?? 0} items`);
+        if (!d.actions || d.actions.length === 0) {
+          dispatch({ type: "nextActionsState", nextActions: { kind: "error", reason: "empty" } });
+          return;
+        }
+        dispatch({
+          type: "nextActionsState",
+          nextActions: { kind: "done", source: d.source, actions: d.actions },
+        });
+      })
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn(`[next-actions] fallback:`, reason);
+        dispatch({ type: "nextActionsState", nextActions: { kind: "error", reason } });
+      })
+      .finally(() => clearTimeout(timeoutId));
+  }, [state.aiRanking.kind, state.nextActions.kind]);
+
+  // A2 进 final → 后台调 /api/compare-summary 拿汇总段落 + reflection 报告
+  useEffect(() => {
+    if (state.stage !== "final" || state.agent !== "a2") return;
+    if (state.compareSummary.kind === "loading" || state.compareSummary.kind === "done") return;
+
+    dispatch({ type: "compareSummaryState", compareSummary: { kind: "loading" } });
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 18000);
+
+    // 从 mock 数据拿 stats 和 hits — A2 比对统计本身是 deterministic 数据 join, 不用 AI 算
+    // 这里只让 AI 做 "语义化解读 + 反思校验报告" 这两段中文
+    import("@/data/compare.mock")
+      .then(({ COMPARE_STATS, A2_TOTAL_RAW, A2_ASSET_COUNT, PATCH_HITS }) =>
+        fetch("/api/compare-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            scenario: "组织结构 · 订单中心 多源漏洞清洗",
+            assetScope: "组织结构 · 订单中心",
+            assetCount: A2_ASSET_COUNT,
+            totalRaw: A2_TOTAL_RAW,
+            stats: COMPARE_STATS,
+            mergesConfirmed: state.mergesConfirmed,
+            partial: state.abnormal === "patch" || state.abnormal === "partial",
+            hits: PATCH_HITS.map((h) => ({ cve: h.cve, name: h.name, patch: h.patch })),
+          }),
+          signal: ctrl.signal,
+        })
+      )
+      .then(async (r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return (await r.json()) as {
+          source: "ai" | "mock";
+          summary: string;
+          reflection: string;
+        };
+      })
+      .then((d) => {
+        // eslint-disable-next-line no-console
+        console.log(`[compare-summary] ${d.source} ok`);
+        if (!d.summary || !d.reflection) {
+          dispatch({
+            type: "compareSummaryState",
+            compareSummary: { kind: "error", reason: "missing fields" },
+          });
+          return;
+        }
+        dispatch({
+          type: "compareSummaryState",
+          compareSummary: {
+            kind: "done",
+            source: d.source,
+            summary: d.summary,
+            reflection: d.reflection,
+          },
+        });
+      })
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn(`[compare-summary] fallback:`, reason);
+        dispatch({ type: "compareSummaryState", compareSummary: { kind: "error", reason } });
+      })
+      .finally(() => clearTimeout(timeoutId));
+  }, [state.stage, state.agent, state.compareSummary.kind, state.mergesConfirmed, state.abnormal]);
 
   useEffect(() => {
     if (state.stage !== "reflect") return;
