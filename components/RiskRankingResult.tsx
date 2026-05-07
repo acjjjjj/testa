@@ -46,7 +46,14 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
           <b>智能风险排序</b>
           {statusBadge}
           <span className="dim2">
-            {isAi ? "AI 实时打分" : "耗时 24.3s"} · {totalCount} 条全部覆盖
+            {isLoading
+              ? "AI 评分中…"
+              : isAi
+                ? `AI 实时打分${ai.kind === "done" && ai.elapsedSec ? ` · 用时 ${ai.elapsedSec.toFixed(1)}s` : ""}`
+                : ai.kind === "error"
+                  ? "AI 调用失败 · 展示历史 mock"
+                  : "mock 数据"}{" "}
+            · {totalCount} 条全部覆盖
           </span>
         </div>
         <div className="text">

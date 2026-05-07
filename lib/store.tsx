@@ -24,7 +24,15 @@ import { LUI_FOLLOWUP_BUDGET } from "@/lib/scoring";
 export type AiRankingState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "done"; source: "ai" | "mock"; model?: string; summary: string; ranked: RankedVuln[] }
+  | {
+      kind: "done";
+      source: "ai" | "mock";
+      model?: string;
+      summary: string;
+      ranked: RankedVuln[];
+      /** 真实耗时(秒), 用于 UI 显示 "AI 实时打分 · 用时 X.Xs" */
+      elapsedSec?: number;
+    }
   | { kind: "error"; reason: string };
 
 interface DemoState {
@@ -145,14 +153,21 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   }, [state.stage]);
 
   // A1 进入 running 时, 后台调真 AI 做排序; UI 在 final 阶段消费结果
+  //
+  // 关键: 不能在 useEffect cleanup 里 abort fetch.
+  // workflow 推进 (running→reflect→final) 会触发 deps 变化并执行 cleanup,
+  // 如果在 cleanup 里 abort, 真 AI 调用会在 2.4s 时被自杀, 永远进不到 .then 分支
   useEffect(() => {
     if (state.stage !== "running" || state.agent !== "a1") return;
-    let aborted = false;
-    const ctrl = new AbortController();
-    // 客户端兜底超时 28s (Vercel Edge 25s + 缓冲), 防止 fetch 永久 hang
-    const timeoutId = setTimeout(() => ctrl.abort(), 28000);
+    // 去重: 同一次会话只发起一次, 避免重复触发
+    if (state.aiRanking.kind === "loading" || state.aiRanking.kind === "done") return;
 
     dispatch({ type: "rankingState", ranking: { kind: "loading" } });
+    const ctrl = new AbortController();
+    const startedAt = Date.now();
+    // 28s 客户端兜底 (Vercel Edge 25s 之外的安全网)
+    const timeoutId = setTimeout(() => ctrl.abort(), 28000);
+
     fetch("/api/rank", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -172,7 +187,9 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         };
       })
       .then((d) => {
-        if (aborted) return;
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        // eslint-disable-next-line no-console
+        console.log(`[a1 ranking] ${d.source} ok, ${elapsed}s, ${d.ranked?.length ?? 0} items`);
         if (!d.ranked || d.ranked.length === 0) {
           dispatch({ type: "rankingState", ranking: { kind: "error", reason: "empty" } });
           return;
@@ -185,24 +202,22 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             model: d.model,
             summary: d.summary ?? "",
             ranked: d.ranked,
+            elapsedSec: Number(elapsed),
           },
         });
       })
       .catch((err: unknown) => {
-        if (aborted) return;
         const reason = err instanceof Error ? err.message : "unknown";
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
         // eslint-disable-next-line no-console
-        console.warn("[a1 ranking] fallback to mock:", reason);
+        console.warn(`[a1 ranking] fallback to mock after ${elapsed}s:`, reason);
         dispatch({ type: "rankingState", ranking: { kind: "error", reason } });
       })
       .finally(() => clearTimeout(timeoutId));
 
-    return () => {
-      aborted = true;
-      ctrl.abort();
-      clearTimeout(timeoutId);
-    };
-  }, [state.stage, state.agent]);
+    // 注意: 这里不返回 cleanup 函数, 让 fetch 跑完它自己的生命周期 (28s 超时 / 完成 / 失败)
+    // 即使 stage 推进到 reflect/final, 这个请求也继续在背后跑
+  }, [state.stage, state.agent, state.aiRanking.kind]);
 
   useEffect(() => {
     if (state.stage !== "reflect") return;
