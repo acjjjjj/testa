@@ -166,7 +166,10 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                   }))}
                 >
                   <span>{dataSourcesShown.join(" + ")}</span>
-                  <span className="dim2 mono">{dataSourcesShown.length} / 4</span>
+                  <span style={dsRightStyle}>
+                    <span className="dim2 mono">{dataSourcesShown.length} / 4</span>
+                    <Icon name="caret" size={12} />
+                  </span>
                 </Dropdown>
                 <div className="hint">v1 支持 内部 / 威胁情报 / CVE / CNNVD</div>
               </div>
@@ -215,4 +218,10 @@ const ctrlBtnStyle: React.CSSProperties = {
   font: "inherit",
   textAlign: "left",
   cursor: "pointer",
+};
+
+const dsRightStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
 };
