@@ -148,6 +148,10 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (state.stage !== "running" || state.agent !== "a1") return;
     let aborted = false;
+    const ctrl = new AbortController();
+    // 客户端兜底超时 28s (Vercel Edge 25s + 缓冲), 防止 fetch 永久 hang
+    const timeoutId = setTimeout(() => ctrl.abort(), 28000);
+
     dispatch({ type: "rankingState", ranking: { kind: "loading" } });
     fetch("/api/rank", {
       method: "POST",
@@ -156,9 +160,18 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
         scenario: "运营商核心业务 (业务上线前 + 红蓝对抗前)",
         items: A1_RANK_INPUT,
       }),
+      signal: ctrl.signal,
     })
-      .then((r) => r.json())
-      .then((d: { source: "ai" | "mock"; model?: string; summary?: string; ranked: RankedVuln[] }) => {
+      .then(async (r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return (await r.json()) as {
+          source: "ai" | "mock";
+          model?: string;
+          summary?: string;
+          ranked: RankedVuln[];
+        };
+      })
+      .then((d) => {
         if (aborted) return;
         if (!d.ranked || d.ranked.length === 0) {
           dispatch({ type: "rankingState", ranking: { kind: "error", reason: "empty" } });
@@ -178,10 +191,16 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       .catch((err: unknown) => {
         if (aborted) return;
         const reason = err instanceof Error ? err.message : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn("[a1 ranking] fallback to mock:", reason);
         dispatch({ type: "rankingState", ranking: { kind: "error", reason } });
-      });
+      })
+      .finally(() => clearTimeout(timeoutId));
+
     return () => {
       aborted = true;
+      ctrl.abort();
+      clearTimeout(timeoutId);
     };
   }, [state.stage, state.agent]);
 

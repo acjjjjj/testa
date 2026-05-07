@@ -32,6 +32,8 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
     <Badge tone="mint">DeepSeek 实时排序 · 已完成</Badge>
   ) : ai.kind === "done" && ai.source === "mock" ? (
     <Badge tone="amber">mock 兜底 · 已完成</Badge>
+  ) : ai.kind === "error" ? (
+    <Badge tone="amber">AI 调用超时 · 已展示历史 mock</Badge>
   ) : (
     <Badge tone="mint">已完成</Badge>
   );

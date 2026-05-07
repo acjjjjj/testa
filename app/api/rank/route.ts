@@ -56,7 +56,7 @@ sceneTag 输出场景关键词, 只能从上面 5 个里选一个最匹配。
 
 综合排序分 score = min(base × sceneWeight, 10), 保留一位小数。
 
-desc 输出: 用 28-50 个汉字给出一句"为什么排这位"的中文理由, 必须基于本条的 vptA/V/I 维度+场景说服力。
+desc 输出: 用 18-30 个汉字给出一句"为什么排这位"的中文理由, 必须基于本条的 vptA/V/I 维度+场景说服力, 简短直接。
 
 严格输出 JSON object, 不要任何前言或代码块标记:
 {
@@ -123,9 +123,10 @@ export async function POST(req: NextRequest): Promise<Response> {
         ],
         response_format: { type: "json_object" },
         temperature: 0.3,
-        max_tokens: 3500,
+        max_tokens: 2200,
       }),
-      signal: AbortSignal.timeout(25000),
+      // Vercel Hobby 上限 25s, 这里 18s 留 7s 给 mock fallback 序列化返回
+      signal: AbortSignal.timeout(18000),
     });
 
     if (!upstream.ok) {
