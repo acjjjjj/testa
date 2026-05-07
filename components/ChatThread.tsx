@@ -16,16 +16,17 @@ import { WritebackDoneCard } from "./WritebackDoneCard";
 
 /** 主对话区 — 根据 stage 渲染不同 bubble 序列 */
 export function ChatThread() {
-  const { state, setStage, setAgent, set, openWriteback, handoffTo } = useDemoStore();
-  const { stage, agent, abnormal, handoffVuln } = state;
+  const { state, setStage, set, openWriteback, handoffTo, startWithQuery, startAgent } =
+    useDemoStore();
+  const { stage, agent, abnormal, handoffVuln, userQuery } = state;
 
   if (stage === "welcome") {
     return (
       <div style={convAreaStyle}>
         <div style={convInnerStyle}>
           <Welcome
-            onPick={(a) => set({ agent: a, stage: "lui" })}
-            onAsk={(_text) => set({ agent: "a1", stage: "lui" })}
+            onPick={(a) => startAgent(a)}
+            onAsk={(text) => startWithQuery(text, /排序|排查比对/.test(text) && text.includes("比对") ? "a2" : "a1")}
           />
         </div>
       </div>
@@ -43,7 +44,7 @@ export function ChatThread() {
               <b>An</b>
               <span className="dim2">10:41</span>
             </div>
-            <div className="text">{defaultUserQueryFor(agent)}</div>
+            <div className="text">{userQuery || defaultUserQueryFor(agent)}</div>
           </div>
         </div>
 

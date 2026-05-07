@@ -35,6 +35,27 @@ export type AiRankingState =
     }
   | { kind: "error"; reason: string };
 
+/** LUI 参数智能抽取 (A1 / A2 共用) 的运行态 */
+export type ExtractedParams = {
+  source: "ai" | "mock";
+  model?: string;
+  confidence: number;
+  assetScope: string;
+  assetCount?: number;
+  severity: "高危" | "中危" | "低危";
+  timeWindow: string;
+  businessTag: string;
+  sceneWeight: number;
+  dataSources?: string[];
+  compareDims?: string[];
+  withPatch?: boolean;
+};
+export type ParamsState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "done"; params: ExtractedParams }
+  | { kind: "error"; reason: string };
+
 interface DemoState {
   agent: AgentId;
   stage: Stage;
@@ -51,6 +72,10 @@ interface DemoState {
   handoffVuln: RankedVuln | null;
   /** A1 真 AI 排序结果 */
   aiRanking: AiRankingState;
+  /** 用户在底部输入框 / 示例 chip 输入的原始 query */
+  userQuery: string;
+  /** AI 解析后的 LUI 参数 */
+  paramsState: ParamsState;
 }
 
 type Action =
@@ -61,7 +86,10 @@ type Action =
   | { type: "closeWriteback" }
   | { type: "writebackConfirm" }
   | { type: "handoff"; vuln: RankedVuln }
-  | { type: "rankingState"; ranking: AiRankingState };
+  | { type: "rankingState"; ranking: AiRankingState }
+  | { type: "paramsState"; params: ParamsState }
+  | { type: "queryStart"; query: string; agent: AgentId }
+  | { type: "resetSession" };
 
 const askPairsCount = MERGE_PAIRS.filter((p) => p.action === "ask").length;
 
@@ -75,6 +103,8 @@ const initialState: DemoState = {
   writebackOpen: false,
   handoffVuln: null,
   aiRanking: { kind: "idle" },
+  userQuery: "",
+  paramsState: { kind: "idle" },
 };
 
 function reducer(state: DemoState, action: Action): DemoState {
@@ -115,6 +145,31 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, handoffVuln: action.vuln, stage: "handoff" };
     case "rankingState":
       return { ...state, aiRanking: action.ranking };
+    case "paramsState":
+      return { ...state, paramsState: action.params };
+    case "queryStart":
+      return {
+        ...state,
+        userQuery: action.query,
+        agent: action.agent,
+        stage: "lui",
+        abnormal: "none",
+        // 清掉之前的 AI 抽取 / 排序结果, 触发重新跑
+        paramsState: { kind: "loading" },
+        aiRanking: { kind: "idle" },
+      };
+    case "resetSession":
+      return {
+        ...state,
+        stage: "welcome",
+        abnormal: "none",
+        userQuery: "",
+        paramsState: { kind: "idle" },
+        aiRanking: { kind: "idle" },
+        mergeAnswers: {},
+        pendingIdx: 0,
+        handoffVuln: null,
+      };
     default:
       return state;
   }
@@ -132,6 +187,12 @@ interface DemoCtx {
   closeWriteback: () => void;
   writebackConfirm: () => void;
   handoffTo: (vuln: RankedVuln) => void;
+  /** 带 query 启动一个 agent: 推进 stage→lui + 后台调 /api/extract-params */
+  startWithQuery: (query: string, agent: AgentId) => void;
+  /** 直接进 LUI (老路径, 没有用户 query) — 跳过 AI 参数抽取, 用默认值 */
+  startAgent: (agent: AgentId) => void;
+  /** 重置回欢迎页 */
+  resetSession: () => void;
 }
 
 const Ctx = createContext<DemoCtx | null>(null);
@@ -236,6 +297,58 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: "set", patch });
   }, []);
 
+  const startWithQuery = useCallback((query: string, agent: AgentId) => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    dispatch({ type: "queryStart", query: trimmed, agent });
+
+    // 后台调 /api/extract-params 把 query → 结构化参数
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 12000);
+
+    fetch("/api/extract-params", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: trimmed, agent }),
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return (await r.json()) as ExtractedParams;
+      })
+      .then((params) => {
+        // eslint-disable-next-line no-console
+        console.log(`[extract-params] ${params.source} ok, conf=${params.confidence}`);
+        dispatch({ type: "paramsState", params: { kind: "done", params } });
+      })
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn("[extract-params] failed:", reason);
+        dispatch({ type: "paramsState", params: { kind: "error", reason } });
+      })
+      .finally(() => clearTimeout(timeoutId));
+  }, []);
+
+  const startAgent = useCallback((agent: AgentId) => {
+    // 走老路径: 不带 query, 直接进 LUI 卡, params 用默认 mock
+    dispatch({
+      type: "set",
+      patch: {
+        agent,
+        stage: "lui",
+        abnormal: "none",
+        userQuery: "",
+        paramsState: { kind: "idle" },
+        aiRanking: { kind: "idle" },
+      },
+    });
+  }, []);
+
+  const resetSession = useCallback(() => {
+    dispatch({ type: "resetSession" });
+  }, []);
+
   const value = useMemo<DemoCtx>(
     () => ({
       state,
@@ -250,8 +363,11 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       closeWriteback: () => dispatch({ type: "closeWriteback" }),
       writebackConfirm: () => dispatch({ type: "writebackConfirm" }),
       handoffTo: (vuln) => dispatch({ type: "handoff", vuln }),
+      startWithQuery,
+      startAgent,
+      resetSession,
     }),
-    [state, set]
+    [state, set, startWithQuery, startAgent, resetSession]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

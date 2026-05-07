@@ -4,16 +4,46 @@ import * as React from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
 import { Seg } from "./Seg";
+import { useDemoStore } from "@/lib/store";
 
 export interface LuiParamCardA2Props {
   onSubmit: () => void;
   onCancel: () => void;
 }
 
-/** Agent 2 LUI 参数确认卡 — 4 字段 */
+/** Agent 2 LUI 参数确认卡 — 4 字段, 数据来源 = AI 抽取 / mock 兜底 / 默认值 */
 export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
-  const [dim, setDim] = React.useState("cpe");
-  const [usePatch, setUsePatch] = React.useState("是");
+  const { state } = useDemoStore();
+  const ps = state.paramsState;
+
+  const ai = ps.kind === "done" ? ps.params : null;
+  const isLoading = ps.kind === "loading";
+  const isAi = ai?.source === "ai";
+  const confidence = ai?.confidence ?? 0.91;
+
+  const assetScope = ai?.assetScope ?? "组织结构 / 订单中心";
+  const assetCount = ai?.assetCount ?? 64;
+  const dataSourcesArr = ai?.dataSources ?? ["内部漏洞库", "威胁情报", "CVE"];
+  const dataSourcesText = dataSourcesArr.join(" + ");
+  const initialDim = ai?.compareDims?.[0] ?? "cpe";
+  const initialPatch = ai?.withPatch === false ? "否" : "是";
+
+  const [dim, setDim] = React.useState(initialDim);
+  const [usePatch, setUsePatch] = React.useState(initialPatch);
+  React.useEffect(() => {
+    if (ai?.compareDims?.[0]) setDim(ai.compareDims[0]);
+  }, [ai?.compareDims]);
+  React.useEffect(() => {
+    if (typeof ai?.withPatch === "boolean") setUsePatch(ai.withPatch ? "是" : "否");
+  }, [ai?.withPatch]);
+
+  const sourceBadge = isLoading ? (
+    <Badge tone="amber">AI 解析中…</Badge>
+  ) : isAi ? (
+    <Badge tone="mint">DeepSeek 抽取</Badge>
+  ) : ai ? (
+    <Badge tone="amber">本地兜底</Badge>
+  ) : null;
 
   return (
     <div className="msg agent a2">
@@ -24,7 +54,11 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
           <Badge tone="mint">参数确认</Badge>
           <span className="dim2">10:42</span>
         </div>
-        <div className="text dim">已识别资产范围, 请确认数据源与比对维度。</div>
+        <div className="text dim">
+          {isLoading
+            ? "AI 正在解析资产范围 / 数据源 / 比对维度..."
+            : "已识别资产范围, 请确认数据源与比对维度。"}
+        </div>
 
         <div className="card lui">
           <div className="ch">
@@ -32,9 +66,10 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
               <Icon name="note" size={14} />
               <span>LUI 参数卡片</span>
               <span className="ix">智能风险排查比对</span>
+              {sourceBadge}
             </div>
             <div className="m">
-              <span>抽取置信度 0.91</span>
+              <span>抽取置信度 {confidence.toFixed(2)}</span>
             </div>
           </div>
           <div className="cb">
@@ -46,7 +81,7 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                 </div>
                 <div className="ctrl">
                   <span>
-                    <b>组织结构 / 订单中心</b> · 关联 64 资产
+                    <b>{assetScope}</b> · 关联 {assetCount} 资产
                   </span>
                   <Icon name="caret" size={12} />
                 </div>
@@ -58,8 +93,8 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
                   <span className="req">必填</span>
                 </div>
                 <div className="ctrl">
-                  <span>内部漏洞库 + 威胁情报 + CVE</span>
-                  <span className="dim2 mono">3 / 4</span>
+                  <span>{dataSourcesText}</span>
+                  <span className="dim2 mono">{dataSourcesArr.length} / 4</span>
                 </div>
                 <div className="hint">v1 支持 内部 / 威胁情报 / CVE / CNNVD</div>
               </div>
@@ -92,8 +127,8 @@ export function LuiParamCardA2({ onSubmit, onCancel }: LuiParamCardA2Props) {
               <button className="btn gh" onClick={onCancel}>
                 取消
               </button>
-              <button className="btn pr" onClick={onSubmit}>
-                确认参数, 开始执行
+              <button className="btn pr" onClick={onSubmit} disabled={isLoading}>
+                {isLoading ? "AI 解析中…" : "确认参数, 开始执行"}
               </button>
             </div>
           </div>
