@@ -54,6 +54,8 @@ export type CompareSummaryState =
 export type ExtractedParams = {
   source: "ai" | "mock";
   model?: string;
+  intent: "a1" | "a2" | "chat";
+  reply?: string; // chat 模式专用
   confidence: number;
   assetScope: string;
   assetCount?: number;
@@ -64,6 +66,15 @@ export type ExtractedParams = {
   dataSources?: string[];
   compareDims?: string[];
   withPatch?: boolean;
+};
+
+/** 聊天气泡 (chat 意图时累积) */
+export type ChatBubble = {
+  id: string;
+  role: "user" | "agent";
+  text: string;
+  ts: number;
+  source?: "ai" | "mock";
 };
 export type ParamsState =
   | { kind: "idle" }
@@ -99,6 +110,10 @@ interface DemoState {
   activeHistoryId: string | null;
   /** 用户运行时新建的对话条目 (从底部输入框 / 示例 chip 启动的, 不含 mock HISTORY) */
   dynamicHistory: HistoryItem[];
+  /** 聊天气泡 (intent=chat 时累积) — 跟 LUI / workflow 流程互斥, 走"对话模式" */
+  chatBubbles: ChatBubble[];
+  /** 是否正在做意图分类 (extract-params 调用中, 但还没确定走 task / chat) */
+  classifying: boolean;
 }
 
 type Action =
@@ -114,6 +129,15 @@ type Action =
   | { type: "compareSummaryState"; compareSummary: CompareSummaryState }
   | { type: "paramsState"; params: ParamsState }
   | { type: "queryStart"; query: string; agent: AgentId; historyId?: string | null }
+  | {
+      type: "taskClassified";
+      params: ExtractedParams;
+      agent: AgentId;
+      query: string;
+      historyId?: string | null;
+    }
+  | { type: "chatPush"; bubble: ChatBubble }
+  | { type: "classifyDone" }
   | { type: "resetSession" };
 
 const askPairsCount = MERGE_PAIRS.filter((p) => p.action === "ask").length;
@@ -134,6 +158,8 @@ const initialState: DemoState = {
   paramsState: { kind: "idle" },
   activeHistoryId: null,
   dynamicHistory: [],
+  chatBubbles: [],
+  classifying: false,
 };
 
 function reducer(state: DemoState, action: Action): DemoState {
@@ -181,14 +207,46 @@ function reducer(state: DemoState, action: Action): DemoState {
     case "paramsState":
       return { ...state, paramsState: action.params };
     case "queryStart": {
-      // 没有 historyId = 用户从底部输入框 / 示例 chip 启动的新对话
-      // → 在 dynamicHistory 顶部插入一条新条目, activeHistoryId 指向它
+      // 推一个 user bubble 到 chatBubbles (不论后续 intent 是 task 还是 chat 都要显示用户说了什么)
+      // 注意: stage 不立刻进 "lui", 因为还没分类完意图. 改成 classifying=true 占位.
+      // 等 extract-params 返回:
+      //   - intent=a1/a2 → 在 startWithQuery 里 setStage("lui")
+      //   - intent=chat  → 推 agent reply bubble, stage 保持 (welcome 或当前)
+      const userBubble: ChatBubble = {
+        id: `u-${Date.now()}`,
+        role: "user",
+        text: action.query,
+        ts: Date.now(),
+      };
+      return {
+        ...state,
+        userQuery: action.query,
+        agent: action.agent,
+        // stage 暂不变 — 让 extract-params 返回后再决定
+        abnormal: "none",
+        paramsState: { kind: "loading" },
+        aiRanking: { kind: "idle" },
+        nextActions: { kind: "idle" },
+        compareSummary: { kind: "idle" },
+        chatBubbles: [...state.chatBubbles, userBubble],
+        classifying: true,
+        activeHistoryId: action.historyId ?? state.activeHistoryId,
+      };
+    }
+    case "chatPush":
+      return {
+        ...state,
+        chatBubbles: [...state.chatBubbles, action.bubble],
+      };
+    case "classifyDone":
+      return { ...state, classifying: false };
+    case "taskClassified": {
+      // 意图分类完成且是任务 → 推进到 LUI 流程, 同时按需新增 dynamicHistory 条目
       const isReplay = action.historyId != null;
       let nextDynamic = state.dynamicHistory;
-      let nextActiveId = action.historyId ?? null;
+      let nextActiveId = action.historyId ?? state.activeHistoryId;
       if (!isReplay) {
         const newId = `dyn-${Date.now()}`;
-        // title 取 query 前 28 字 (UI 列表里太长会截断), 给现网/比对 query 一个干净的标题
         const title = action.query.length > 28 ? action.query.slice(0, 28) + "…" : action.query;
         const newItem: HistoryItem = {
           id: newId,
@@ -197,7 +255,6 @@ function reducer(state: DemoState, action: Action): DemoState {
           m: "刚刚",
           live: true,
         };
-        // 把上一个 live 条目 (如果有) 的 live 关掉
         nextDynamic = [
           newItem,
           ...state.dynamicHistory.map((h) => (h.live ? { ...h, live: false } : h)),
@@ -206,14 +263,10 @@ function reducer(state: DemoState, action: Action): DemoState {
       }
       return {
         ...state,
-        userQuery: action.query,
         agent: action.agent,
         stage: "lui",
-        abnormal: "none",
-        paramsState: { kind: "loading" },
-        aiRanking: { kind: "idle" },
-        nextActions: { kind: "idle" },
-        compareSummary: { kind: "idle" },
+        classifying: false,
+        paramsState: { kind: "done", params: action.params },
         activeHistoryId: nextActiveId,
         dynamicHistory: nextDynamic,
       };
@@ -235,6 +288,8 @@ function reducer(state: DemoState, action: Action): DemoState {
         handoffVuln: null,
         activeHistoryId: null,
         dynamicHistory: state.dynamicHistory.map((h) => (h.live ? { ...h, live: false } : h)),
+        chatBubbles: [],
+        classifying: false,
       };
     default:
       return state;
@@ -507,14 +562,41 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       })
       .then((params) => {
         // eslint-disable-next-line no-console
-        console.log(`[extract-params] ${params.source} ok, conf=${params.confidence}`);
-        dispatch({ type: "paramsState", params: { kind: "done", params } });
+        console.log(`[extract-params] ${params.source} intent=${params.intent} conf=${params.confidence}`);
+        if (params.intent === "chat") {
+          // chat 分支: 推一个 agent reply bubble, 不走 LUI 流程
+          dispatch({
+            type: "chatPush",
+            bubble: {
+              id: `a-${Date.now()}`,
+              role: "agent",
+              text: params.reply ?? "我没太明白, 试试发个具体任务。",
+              ts: Date.now(),
+              source: params.source,
+            },
+          });
+          dispatch({ type: "classifyDone" });
+          return;
+        }
+        // task 分支 (a1 / a2): 用 AI 分类的 intent 覆盖前端启发式的 agent
+        dispatch({
+          type: "taskClassified",
+          params,
+          agent: params.intent,
+          query: trimmed,
+          historyId,
+        });
       })
       .catch((err: unknown) => {
         const reason = err instanceof Error ? err.message : "unknown";
         // eslint-disable-next-line no-console
         console.warn("[extract-params] failed:", reason);
+        // 失败兜底: 按前端启发式当任务跑 (老路径)
         dispatch({ type: "paramsState", params: { kind: "error", reason } });
+        dispatch({
+          type: "set",
+          patch: { stage: "lui", classifying: false },
+        });
       })
       .finally(() => clearTimeout(timeoutId));
     },

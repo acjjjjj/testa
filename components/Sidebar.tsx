@@ -15,11 +15,23 @@ export interface SidebarProps {
 
 /** 历史对话侧栏 */
 export function Sidebar({ activeId, dynamicHistory = [], onPick, onNew }: SidebarProps) {
+  const [search, setSearch] = React.useState("");
+
   // dynamic 在前 + mock HISTORY 在后, 都参与搜索 / 高亮 / 渲染
   const allItems = React.useMemo(
     () => [...dynamicHistory, ...HISTORY],
     [dynamicHistory]
   );
+
+  // 搜索过滤: 模糊匹配 title / tag (大小写不敏感, 中英文都能搜)
+  const filtered = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return allItems;
+    return allItems.filter(
+      (c) => c.t.toLowerCase().includes(q) || (c.tag || "").toLowerCase().includes(q)
+    );
+  }, [allItems, search]);
+
   return (
     <aside className="side-pane" style={asideStyle}>
       <div style={hdStyle}>
@@ -30,16 +42,27 @@ export function Sidebar({ activeId, dynamicHistory = [], onPick, onNew }: Sideba
       </div>
       <div style={{ padding: "8px 12px" }}>
         <input
-          placeholder="搜索对话标题…"
+          placeholder="搜索对话标题或 tag…"
           style={searchInputStyle}
-          onChange={() => {
-            /* mock — no-op */
-          }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
-      <div style={groupStyle}>最近</div>
+      <div style={groupStyle}>
+        最近
+        {search.trim() && (
+          <span style={{ color: "var(--fg-3)", fontWeight: 400, marginLeft: 8 }}>
+            {filtered.length}/{allItems.length}
+          </span>
+        )}
+      </div>
       <div style={listStyle}>
-        {allItems.map((c) => (
+        {filtered.length === 0 && (
+          <div style={{ padding: "12px 10px", color: "var(--fg-3)", fontSize: 12 }}>
+            没有匹配 &quot;{search}&quot; 的对话
+          </div>
+        )}
+        {filtered.map((c) => (
           <div
             key={c.id}
             className={`conv ${c.id === activeId ? "active" : ""}`}

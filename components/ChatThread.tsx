@@ -21,13 +21,95 @@ export function ChatThread() {
   const { stage, agent, abnormal, handoffVuln, userQuery } = state;
 
   if (stage === "welcome") {
+    // 如果有 chat 气泡 (用户发了非任务 query 进来 chat 模式), 显示气泡列表 + classifying loader
+    // 否则显示 Welcome 卡
+    const hasChat = state.chatBubbles.length > 0 || state.classifying;
     return (
       <div style={convAreaStyle}>
         <div style={convInnerStyle}>
-          <Welcome
-            onPick={(a) => startAgent(a)}
-            onAsk={(text) => startWithQuery(text, /排序|排查比对/.test(text) && text.includes("比对") ? "a2" : "a1")}
-          />
+          {hasChat ? (
+            <>
+              {state.chatBubbles.map((b) =>
+                b.role === "user" ? (
+                  <div key={b.id} className="msg user">
+                    <div className="av">An</div>
+                    <div className="body">
+                      <div className="who">
+                        <b>An</b>
+                        <span className="dim2">
+                          {new Date(b.ts).toLocaleTimeString("zh-CN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className="text">{b.text}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={b.id} className="msg agent">
+                    <div className="av">哨</div>
+                    <div className="body">
+                      <div className="who">
+                        <b>哨兵 AI 助手</b>
+                        {b.source === "ai" ? (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              padding: "1px 6px",
+                              borderRadius: 999,
+                              background: "color-mix(in oklab, var(--mint) 22%, var(--bg-3))",
+                              color: "var(--mint)",
+                            }}
+                          >
+                            DeepSeek 回复
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              padding: "1px 6px",
+                              borderRadius: 999,
+                              background: "color-mix(in oklab, var(--amber) 22%, var(--bg-3))",
+                              color: "var(--amber)",
+                            }}
+                          >
+                            mock 兜底
+                          </span>
+                        )}
+                        <span className="dim2">
+                          {new Date(b.ts).toLocaleTimeString("zh-CN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className="text">{b.text}</div>
+                    </div>
+                  </div>
+                )
+              )}
+              {state.classifying && (
+                <div className="msg agent">
+                  <div className="av">哨</div>
+                  <div className="body">
+                    <div className="who">
+                      <b>哨兵 AI 助手</b>
+                      <span className="dim2">正在分析意图…</span>
+                    </div>
+                    <div
+                      className="text dim"
+                      style={{ fontStyle: "italic", color: "var(--fg-3)" }}
+                    >
+                      DeepSeek 正在判断这是任务请求还是一般对话…
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <Welcome onPick={(a) => startAgent(a)} onAsk={(text) => startWithQuery(text, "a1")} />
+          )}
         </div>
       </div>
     );
