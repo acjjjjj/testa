@@ -225,11 +225,10 @@ function reducer(state: DemoState, action: Action): DemoState {
     case "paramsState":
       return { ...state, paramsState: action.params };
     case "queryStart": {
-      // 推一个 user bubble 到 chatBubbles (不论后续 intent 是 task 还是 chat 都要显示用户说了什么)
-      // 注意: stage 不立刻进 "lui", 因为还没分类完意图. 改成 classifying=true 占位.
+      // 推一个 user bubble + classifying=true. 不碰主流程的 stage/agent/userQuery/paramsState.
       // 等 extract-params 返回:
-      //   - intent=a1/a2 → 在 startWithQuery 里 setStage("lui")
-      //   - intent=chat  → 推 agent reply bubble, stage 保持 (welcome 或当前)
+      //   - intent=chat: 推 agent reply bubble, classifyDone, 主流程一点不动 (用户能边看结果边问问题)
+      //   - intent=task: taskClassified action 全权重置 (跨 stage 也会重置)
       const userBubble: ChatBubble = {
         id: `u-${Date.now()}`,
         role: "user",
@@ -238,17 +237,8 @@ function reducer(state: DemoState, action: Action): DemoState {
       };
       return {
         ...state,
-        userQuery: action.query,
-        agent: action.agent,
-        // stage 暂不变 — 让 extract-params 返回后再决定
-        abnormal: "none",
-        paramsState: { kind: "loading" },
-        aiRanking: { kind: "idle" },
-        nextActions: { kind: "idle" },
-        compareSummary: { kind: "idle" },
         chatBubbles: [...state.chatBubbles, userBubble],
         classifying: true,
-        activeHistoryId: action.historyId ?? state.activeHistoryId,
       };
     }
     case "chatPush":
@@ -259,7 +249,7 @@ function reducer(state: DemoState, action: Action): DemoState {
     case "classifyDone":
       return { ...state, classifying: false };
     case "taskClassified": {
-      // 意图分类完成且是任务 → 推进到 LUI 流程, 同时按需新增 dynamicHistory 条目
+      // 意图分类完成且是任务 → 推进到 LUI 流程, 全量重置主流程状态 (跨 stage 重新发任务也对)
       const isReplay = action.historyId != null;
       let nextDynamic = state.dynamicHistory;
       let nextActiveId = action.historyId ?? state.activeHistoryId;
@@ -283,8 +273,17 @@ function reducer(state: DemoState, action: Action): DemoState {
         ...state,
         agent: action.agent,
         stage: "lui",
+        abnormal: "none",
+        userQuery: action.query,
         classifying: false,
         paramsState: { kind: "done", params: action.params },
+        // 重置上一轮 task 的产物, 让新任务从干净状态开始
+        aiRanking: { kind: "idle" },
+        nextActions: { kind: "idle" },
+        compareSummary: { kind: "idle" },
+        mergeAnswers: {},
+        pendingIdx: 0,
+        writebackTaskId: null,
         activeHistoryId: nextActiveId,
         dynamicHistory: nextDynamic,
       };
