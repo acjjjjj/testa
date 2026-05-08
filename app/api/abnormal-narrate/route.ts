@@ -15,7 +15,7 @@ import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
-export const maxDuration = 12;
+export const maxDuration = 25;
 
 type AbnormalKind = "timeout" | "patch" | "partial" | "budget";
 
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.3,
         max_tokens: 500,
       }),
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(22000),
     });
 
     if (!upstream.ok) return Response.json(mockNarrate(body, `upstream HTTP ${upstream.status}`));

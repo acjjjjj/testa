@@ -14,6 +14,7 @@ import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge"; // Vercel Edge Function, 冷启动快
+export const maxDuration = 25; // Vercel Hobby Edge 上限, 配合 22s AbortSignal
 
 type SimilarityInput = {
   a: { src: string; id: string; nm: string };
@@ -87,8 +88,8 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.2,
         max_tokens: 200,
       }),
-      // 6s 超时, 演示场景不能让用户等
-      signal: AbortSignal.timeout(8000),
+      // 22s 超时 (Vercel Edge 25s 硬上限内, 留 3s 给序列化)
+      signal: AbortSignal.timeout(22000),
     });
 
     if (!upstream.ok) {

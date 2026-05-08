@@ -17,7 +17,7 @@ import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
-export const maxDuration = 12;
+export const maxDuration = 25;
 
 type NextActionsInput = {
   scenario?: string;
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.3,
         max_tokens: 600,
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(22000),
     });
 
     if (!upstream.ok) return Response.json(mockActions(body, `upstream HTTP ${upstream.status}`));

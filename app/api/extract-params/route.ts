@@ -12,7 +12,7 @@ import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
-export const maxDuration = 12;
+export const maxDuration = 25;
 
 type ExtractInput = {
   query: string;
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.1,
         max_tokens: 500,
       }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(22000),
     });
 
     if (!upstream.ok) {
