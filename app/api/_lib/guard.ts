@@ -31,7 +31,8 @@ interface Bucket {
 }
 
 const RATE_WINDOW_MS = 60_000; // 1 分钟
-const RATE_MAX = 20; // 单 IP 单分钟最多 20 次
+const RATE_MAX = 100; // 单 IP 单分钟最多 100 次 (Edge per-instance best-effort)
+// 备注: 之前 20 太严, 演示 + 内部 stress test 都会被自己卡; 100 对正常用户体感 0 影响
 
 const buckets = new Map<string, Bucket>();
 
