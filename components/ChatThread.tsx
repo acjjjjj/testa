@@ -13,12 +13,27 @@ import { RiskCompareResult } from "./RiskCompareResult";
 import { AbnormalAlert } from "./AbnormalAlert";
 import { HandoffBridge } from "./HandoffBridge";
 import { WritebackDoneCard } from "./WritebackDoneCard";
+import { useToast } from "./Toast";
 
 /** 主对话区 — 根据 stage 渲染不同 bubble 序列 */
 export function ChatThread() {
   const { state, setStage, set, openWriteback, handoffTo, startWithQuery, startAgent } =
     useDemoStore();
   const { stage, agent, abnormal, handoffVuln, userQuery } = state;
+  const toast = useToast();
+
+  // PRD § 3.2.4 步骤 9 写回幂等: 已有 task_id → 不再弹确认弹窗, toast 提示并跳到 writeback-done
+  const handleWriteback = () => {
+    if (state.writebackTaskId) {
+      toast.show(
+        `已写回 · task_id=${state.writebackTaskId} · 同 session 同结果集去重 (PRD § 3.2.4 步骤 9)`,
+        "info"
+      );
+      setStage("writeback-done");
+      return;
+    }
+    openWriteback();
+  };
 
   if (stage === "welcome") {
     // 如果有 chat 气泡 (用户发了非任务 query 进来 chat 模式), 显示气泡列表 + classifying loader
@@ -163,7 +178,7 @@ export function ChatThread() {
           ) : (
             <RiskCompareResult
               partial={abnormal === "patch" || abnormal === "partial"}
-              onWriteback={openWriteback}
+              onWriteback={handleWriteback}
             />
           ))}
 

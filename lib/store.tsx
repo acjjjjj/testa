@@ -94,6 +94,8 @@ interface DemoState {
   mergeAnswers: Record<number, MergeAnswer>;
   /** 写回弹窗开关 */
   writebackOpen: boolean;
+  /** 写回任务 id (PRD § 3.2.4 步骤 9 锁: 同 session 同结果集重复点击返回已创建 task_id, 不重建) */
+  writebackTaskId: string | null;
   /** A1 → A2 串联时引用的漏洞 */
   handoffVuln: RankedVuln | null;
   /** A1 真 AI 排序结果 */
@@ -150,6 +152,7 @@ const initialState: DemoState = {
   pendingIdx: 0,
   mergeAnswers: {},
   writebackOpen: false,
+  writebackTaskId: null,
   handoffVuln: null,
   aiRanking: { kind: "idle" },
   nextActions: { kind: "idle" },
@@ -194,8 +197,23 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, writebackOpen: true };
     case "closeWriteback":
       return { ...state, writebackOpen: false };
-    case "writebackConfirm":
-      return { ...state, writebackOpen: false, stage: "writeback-done" };
+    case "writebackConfirm": {
+      // PRD § 3.2.4 步骤 9 幂等: 已有 task_id 不重建, 直接返回 (同 session 同结果集)
+      if (state.writebackTaskId) {
+        return { ...state, writebackOpen: false, stage: "writeback-done" };
+      }
+      // 生成 task_id: RT-{YYYYMMDD}-{session 后 6 位}-{随机 3 位}
+      const d = new Date();
+      const yyyymmdd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+      const seq = String(Math.floor(Math.random() * 900) + 100);
+      const newId = `RT-${yyyymmdd}-mGqA31f-${seq}`;
+      return {
+        ...state,
+        writebackOpen: false,
+        stage: "writeback-done",
+        writebackTaskId: newId,
+      };
+    }
     case "handoff":
       return { ...state, handoffVuln: action.vuln, stage: "handoff" };
     case "rankingState":
@@ -286,6 +304,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         mergeAnswers: {},
         pendingIdx: 0,
         handoffVuln: null,
+        writebackTaskId: null,
         activeHistoryId: null,
         dynamicHistory: state.dynamicHistory.map((h) => (h.live ? { ...h, live: false } : h)),
         chatBubbles: [],

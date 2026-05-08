@@ -7,6 +7,7 @@ import { ScoreBar } from "./ScoreBar";
 import { SORTED_VULNS, A1_TOTAL, A1_NEXT_ACTIONS } from "@/data/ranking.mock";
 import { exportRankingCsv } from "@/lib/exportCsv";
 import { useDemoStore } from "@/lib/store";
+import { useToast } from "./Toast";
 import type { RankedVuln } from "@/types";
 
 export interface RiskRankingResultProps {
@@ -16,6 +17,7 @@ export interface RiskRankingResultProps {
 /** Agent 1 final response — 真 AI 排序 (DeepSeek), 失败 / 加载中走 mock 兜底 */
 export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
   const { state } = useDemoStore();
+  const toast = useToast();
   const ai = state.aiRanking;
   const isAi = ai.kind === "done" && ai.source === "ai";
   const isLoading = ai.kind === "loading";
@@ -24,6 +26,26 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
   const ranked: RankedVuln[] = ai.kind === "done" ? ai.ranked : SORTED_VULNS;
   const totalCount = ranked.length > A1_TOTAL ? ranked.length : A1_TOTAL;
   const summary = ai.kind === "done" && ai.summary ? ai.summary : null;
+
+  /** PRD § 3.2.2 步骤 7: 跳转走 url query string, 带 vuln_ids 跟 lui_params */
+  const handleJumpToRiskMgmt = () => {
+    const vulnIds = ranked.map((r) => r.cve).join(",");
+    const params = state.paramsState.kind === "done" ? state.paramsState.params : null;
+    const luiParams = {
+      asset_scope: params?.assetScope ?? "运营商核心业务线",
+      severity: params?.severity ?? "高危",
+      time_window: params?.timeWindow ?? "近 30 天",
+      business_tag: params?.businessTag ?? "未识别特殊场景",
+    };
+    const baseUrl = "https://insight.example.com/risk-management";
+    const url = `${baseUrl}?vuln_ids=${encodeURIComponent(vulnIds)}&lui_params=${encodeURIComponent(JSON.stringify(luiParams))}`;
+    // eslint-disable-next-line no-console
+    console.log("[a1 → 风险管理跳转] url =", url);
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).catch(() => {});
+    }
+    toast.show(`已生成跳转 URL (mock 不真跳转, 已复制到剪贴板) · ${ranked.length} 条 cve · lui_params 已对齐`, "info");
+  };
 
   // 标签 / 状态条
   const statusBadge = isLoading ? (
@@ -231,7 +253,7 @@ export function RiskRankingResult({ onHandoff }: RiskRankingResultProps) {
           <button className="gh" onClick={() => exportRankingCsv(ranked)}>
             <Icon name="export" size={12} /> 导出 csv
           </button>
-          <button className="pr">
+          <button className="pr" onClick={handleJumpToRiskMgmt}>
             <Icon name="jump" size={12} /> 跳转风险管理模块
           </button>
           <span className="sp" />

@@ -33,7 +33,7 @@ export function ScenarioSwitcher() {
       </div>
       <div className="scn-body">
         <div className="scn-intro">
-          v1 demo 覆盖 <b>11 个场景</b>, 其中 <b>5 个</b> 接通 DeepSeek 实时调用 (标
+          v1 demo 覆盖原型 <b>13 个场景</b>, 其中 <b>5 个</b> 接通 DeepSeek 实时调用 (标
           <span className="scn-badge ai" style={{ marginLeft: 4 }}>
             AI
           </span>
@@ -84,15 +84,27 @@ export function ScenarioSwitcher() {
 
         <button
           className="scn-btn secondary"
-          onClick={() => set({ agent: "a2", stage: "final", abnormal: "partial" })}
+          onClick={() => set({ agent: "a2", stage: "final", abnormal: "timeout" })}
         >
-          <span>⑦ partial 异常 (写回置灰)</span>
+          <span>⑦ 数据源超时 (timeout)</span>
         </button>
         <button
           className="scn-btn secondary"
           onClick={() => set({ agent: "a2", stage: "final", abnormal: "patch" })}
         >
-          <span>⑧ 补丁库不可用</span>
+          <span>⑧ 补丁库不可用 (写回置灰)</span>
+        </button>
+        <button
+          className="scn-btn secondary"
+          onClick={() => set({ agent: "a2", stage: "final", abnormal: "partial" })}
+        >
+          <span>⑨ partial 异常 (写回置灰)</span>
+        </button>
+        <button
+          className="scn-btn secondary"
+          onClick={() => set({ agent: "a2", stage: "final", abnormal: "budget" })}
+        >
+          <span>⑩ 反问预算超额 (budget)</span>
         </button>
         <button
           className="scn-btn secondary"
@@ -118,7 +130,7 @@ export function ScenarioSwitcher() {
             })
           }
         >
-          <span>⑨ A1 → A2 串联桥</span>
+          <span>⑪ A1 → A2 串联桥</span>
         </button>
         <button
           className="scn-btn secondary"
@@ -127,13 +139,13 @@ export function ScenarioSwitcher() {
             openWriteback();
           }}
         >
-          <span>⑩ 写回确认弹窗</span>
+          <span>⑫ 写回确认弹窗</span>
         </button>
         <button
           className="scn-btn secondary"
           onClick={() => set({ agent: "a2", stage: "writeback-done", abnormal: "none" })}
         >
-          <span>⑪ 写回成功态</span>
+          <span>⑬ 写回成功态</span>
         </button>
       </div>
     </div>

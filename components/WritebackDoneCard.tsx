@@ -1,9 +1,16 @@
+"use client";
+
 import * as React from "react";
 import { Badge } from "./Badge";
 import { Icon } from "./Icon";
+import { useDemoStore } from "@/lib/store";
 
 /** 写回成功气泡 */
 export function WritebackDoneCard() {
+  const { state } = useDemoStore();
+  // 真实的 task_id 由 store 在 writebackConfirm 时生成 (幂等 — 同 session 复用)
+  // 兜底兼容直接通过 ScenarioSwitcher 跳到 writeback-done 的场景
+  const taskId = state.writebackTaskId ?? "RT-20260504-mGqA31f-401";
   return (
     <div className="msg agent a2">
       <div className="av">A2</div>
@@ -11,11 +18,11 @@ export function WritebackDoneCard() {
         <div className="who">
           <b>智能风险排查比对</b>
           <Badge tone="mint">已写回</Badge>
-          <span className="dim2 mono">task_id risk-task-2026050401</span>
+          <span className="dim2 mono">task_id {taskId}</span>
         </div>
         <div className="text">
           已写回 <b>鉴微 insight · 风险排查</b> 模块, 任务 ID{" "}
-          <span className="mono em">risk-task-2026050401</span>, 状态 <span className="em">待确认</span>, 7 字段映射全部命中。
+          <span className="mono em">{taskId}</span>, 状态 <span className="em">待确认</span>, 7 字段映射全部命中。
         </div>
         <div className="card">
           <div className="ch">
