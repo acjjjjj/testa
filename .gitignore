@@ -9,3 +9,6 @@ next-env.d.ts
 # 静态导出快照 / 离线分发包 (生成物, 不入仓库)
 deploy-static
 release
+
+# TypeScript incremental build cache
+*.tsbuildinfo
