@@ -12,6 +12,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
 export const maxDuration = 12;
@@ -71,6 +72,9 @@ const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手"的异常路径叙
 严格输出 JSON, 不要前言或代码块标记.`;
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const guard = checkAccess(req);
+  if (!guard.ok) return blockResponse(guard);
+
   let body: AbnormalNarrateInput;
   try {
     body = (await req.json()) as AbnormalNarrateInput;

@@ -11,6 +11,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge"; // Vercel Edge Function, 冷启动快
 
@@ -43,6 +44,9 @@ const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手 — Agent 2 智能
 { "score": 整数 0-100, "reason": "一句话中文理由, 不超过 40 字" }`;
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const guard = checkAccess(req);
+  if (!guard.ok) return blockResponse(guard);
+
   let body: SimilarityInput;
   try {
     body = (await req.json()) as SimilarityInput;

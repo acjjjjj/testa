@@ -95,6 +95,21 @@ export function Welcome({ onPick, onAsk }: WelcomeProps) {
           红蓝对抗前需要紧急处置的互联网暴露资产 0day
         </button>
       </div>
+
+      {/* chat 引导: 让 chat 端点有曝光, 不然领导基本不会去戳 */}
+      <div className="welcome-chat-hint">
+        <span className="k">提示</span>
+        也可以直接问哨兵, 例如{" "}
+        <button className="hint-pill" onClick={() => onAsk("什么是 VPT 三维加权?")}>
+          &quot;什么是 VPT?&quot;
+        </button>{" "}
+        <button className="hint-pill" onClick={() => onAsk("哨兵 AI 助手能干啥?")}>
+          &quot;哨兵能干啥?&quot;
+        </button>{" "}
+        <button className="hint-pill" onClick={() => onAsk("帮我介绍一下 v1 demo 的 AI 接通范围")}>
+          &quot;介绍一下 demo&quot;
+        </button>
+      </div>
     </div>
   );
 }

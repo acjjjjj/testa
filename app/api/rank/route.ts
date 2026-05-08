@@ -12,6 +12,7 @@
 
 import type { NextRequest } from "next/server";
 import type { RankedVuln } from "@/types";
+import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
 export const maxDuration = 30;
@@ -82,6 +83,9 @@ desc 输出: 用 18-30 个汉字给出一句"为什么排这位"的中文理由,
 ranked 数组按 score 从高到低排序, 数量与输入一致。`;
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const guard = checkAccess(req);
+  if (!guard.ok) return blockResponse(guard);
+
   let body: RankInput;
   try {
     body = (await req.json()) as RankInput;

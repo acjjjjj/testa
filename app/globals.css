@@ -373,6 +373,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: def
 .example-btn { padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg-2); color: var(--fg-1); font-size: 12px; line-height: 1.45; text-align: left; cursor: pointer; }
 .example-btn:hover { border-color: var(--line-2); color: var(--fg); }
 .example-btn .k { color: var(--fg-3); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; display: block; }
+.welcome-chat-hint { margin-top: 14px; padding: 10px 14px; border-radius: 10px; border: 1px dashed var(--line); background: color-mix(in oklab, var(--bg-2) 60%, transparent); font-size: 12px; color: var(--fg-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; line-height: 1.5; }
+.welcome-chat-hint .k { color: var(--fg-3); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; background: color-mix(in oklab, var(--mint) 18%, var(--bg-3)); color: var(--mint); }
+.hint-pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--line); color: var(--fg-1); font: inherit; font-size: 11.5px; cursor: pointer; transition: border-color 120ms; }
+.hint-pill:hover { border-color: color-mix(in oklab, var(--mint) 40%, var(--line-2)); color: var(--fg); }
 
 /* Pill */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; background: var(--bg-2); border: 1px solid var(--line); font-size: 11px; color: var(--fg-1); }

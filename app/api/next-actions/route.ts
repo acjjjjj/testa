@@ -14,6 +14,7 @@
  */
 
 import type { NextRequest } from "next/server";
+import { checkAccess, blockResponse } from "../_lib/guard";
 
 export const runtime = "edge";
 export const maxDuration = 12;
@@ -49,6 +50,9 @@ PRD 锁定 3 条建议必须覆盖以下意思 (具体文案你来写, 必须基
 }`;
 
 export async function POST(req: NextRequest): Promise<Response> {
+  const guard = checkAccess(req);
+  if (!guard.ok) return blockResponse(guard);
+
   let body: NextActionsInput;
   try {
     body = (await req.json()) as NextActionsInput;
