@@ -20,7 +20,9 @@ const ALLOWED_HOSTS = [
 ];
 
 const ALLOWED_HOST_SUFFIXES = [
-  ".vercel.app", // 兜底: Vercel preview / branch deploy 的随机域名都允许 (acjjjjj 项目内)
+  ".vercel.app", // Vercel preview / branch deploy 的随机域名都允许 (acjjjjj 项目内)
+  ".zeabur.app", // Zeabur 国际部署
+  ".zeabur.cn", // Zeabur 中国大陆部署 (zeabur.cn 入口给的域名)
 ];
 
 interface Bucket {
