@@ -118,7 +118,7 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    return Response.json(mockExtract(query, agent, "no-key"));
+    return Response.json({ ...mockExtract(query, agent, "no-key"), __debug: "no-key (DEEPSEEK_API_KEY 未在 Vercel 环境变量配置)" });
   }
 
   try {
@@ -145,15 +145,17 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
 
     if (!upstream.ok) {
-      return Response.json(mockExtract(query, agent, `upstream HTTP ${upstream.status}`));
+      const reason = `upstream HTTP ${upstream.status}`;
+      const errBody = await upstream.text().catch(() => "");
+      return Response.json({ ...mockExtract(query, agent, reason), __debug: `${reason}: ${errBody.slice(0, 200)}` });
     }
 
     const data: unknown = await upstream.json();
     const content = extractContent(data);
-    if (!content) return Response.json(mockExtract(query, agent, "empty content"));
+    if (!content) return Response.json({ ...mockExtract(query, agent, "empty content"), __debug: "DeepSeek 返回了响应但 content 为空" });
 
     const parsed = safeParse(content);
-    if (!parsed) return Response.json(mockExtract(query, agent, "json parse failed"));
+    if (!parsed) return Response.json({ ...mockExtract(query, agent, "json parse failed"), __debug: `json parse failed: ${content.slice(0, 200)}` });
 
     return Response.json({
       source: "ai" as const,
@@ -162,7 +164,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
-    return Response.json(mockExtract(query, agent, reason));
+    return Response.json({ ...mockExtract(query, agent, reason), __debug: `网络异常: ${reason}` });
   }
 }
 
