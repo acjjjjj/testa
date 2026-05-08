@@ -6,10 +6,17 @@ import { Icon } from "./Icon";
 import { useDemoStore } from "@/lib/store";
 import { COMPARE_STATS } from "@/data/compare.mock";
 
-/** 写回二次确认弹窗 */
+/** 写回二次确认弹窗 — 任务名称由 /api/compare-summary 实时生成, 兜底用静态文案 */
 export function WritebackConfirmDialog() {
   const { state, closeWriteback, writebackConfirm } = useDemoStore();
   if (!state.writebackOpen) return null;
+
+  // PRD § 3.2.4 字段映射: 任务名称由 lui 卡片参数自动生成 (compare-summary 端点已生成)
+  // 后缀加日期由前端拼 (PRD 没锁日期格式, 用本地 YYYY-MM-DD)
+  const today = new Date().toISOString().slice(0, 10);
+  const aiTaskName = state.compareSummary.kind === "done" ? state.compareSummary.taskName : null;
+  const taskName = aiTaskName ? `${aiTaskName} · ${today}` : `订单中心 多源漏洞清洗 · ${today}`;
+  const isAi = state.compareSummary.kind === "done" && state.compareSummary.source === "ai";
 
   return (
     <div className="modal-mask" onClick={closeWriteback}>
@@ -25,8 +32,21 @@ export function WritebackConfirmDialog() {
           <div className="kv">
             <div className="r">
               <span className="k">任务名称</span>
-              <span className="v">
-                <b>订单中心 多源漏洞清洗</b> · 2026-05-04
+              <span className="v" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <b>{taskName}</b>
+                {isAi && (
+                  <span
+                    style={{
+                      fontSize: 10,
+                      padding: "1px 6px",
+                      borderRadius: 999,
+                      background: "color-mix(in oklab, var(--mint) 22%, var(--bg-3))",
+                      color: "var(--mint)",
+                    }}
+                  >
+                    AI 命名
+                  </span>
+                )}
               </span>
             </div>
             <div className="r">

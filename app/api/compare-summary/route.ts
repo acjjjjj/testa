@@ -45,10 +45,19 @@ const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手 — Agent 2 比对
    - 候选合并对处理率 (= 自动合并 + LUI 确认合并 + 不合并 + 待审核 加总, 应该 = 候选对总数)
    如果 partial=true, 说明 reflection 未通过, 标注 "结构校验未通过, partial 仅供排查"
 
+3. taskName (12-22 个汉字): 写回鉴微 insight 风险排查模块时的任务名称
+   PRD § 3.2.4 字段映射要求 "由 lui 卡片参数自动生成". 必须基于:
+   - 资产范围核心词 (例: 订单中心 / 运营商核心)
+   - 命中漏洞的关键组件 (从 hits 里抽: OFBiz / Struts2 / OpenSSH / log4j2 / runc 容器逃逸 / XZ Utils 等), 至多 2 个
+   - 任务类型 ("多源比对" / "清洗合并")
+   不要带日期 (前端会自动加日期后缀)
+   例: "订单中心 OFBiz / OpenSSH 多源比对" / "运营商核心 log4j2 / Struts2 清洗合并"
+
 严格输出 JSON, 不要前言或代码块标记:
 {
   "summary": "中文段落 80-120 字",
-  "reflection": "中文报告 40-70 字"
+  "reflection": "中文报告 40-70 字",
+  "taskName": "12-22 字任务名称"
 }`;
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -114,6 +123,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       model: "deepseek-chat",
       summary: parsed.summary,
       reflection: parsed.reflection,
+      taskName: parsed.taskName,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : "unknown";
@@ -127,14 +137,18 @@ function extractContent(data: unknown): string | null {
   return choices?.[0]?.message?.content ?? null;
 }
 
-function safeParse(raw: string): { summary: string; reflection: string } | null {
+function safeParse(
+  raw: string
+): { summary: string; reflection: string; taskName: string } | null {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     const summary = typeof o.summary === "string" ? o.summary : null;
     const reflection = typeof o.reflection === "string" ? o.reflection : null;
+    const taskName = typeof o.taskName === "string" ? o.taskName : null;
     if (!summary || !reflection) return null;
-    return { summary, reflection };
+    // taskName 缺失时给一个基于上下文的兜底
+    return { summary, reflection, taskName: taskName ?? "多源漏洞清洗比对" };
   } catch {
     return null;
   }
@@ -143,7 +157,7 @@ function safeParse(raw: string): { summary: string; reflection: string } | null 
 function mockSummary(
   body: CompareSummaryInput,
   note?: string
-): { source: "mock"; summary: string; reflection: string; note?: string } {
+): { source: "mock"; summary: string; reflection: string; taskName: string; note?: string } {
   const { stats } = body;
   const total = stats.added + stats.merged + stats.dup + stats.skip;
   const sum =
@@ -153,5 +167,17 @@ function mockSummary(
   const reflect = body.partial
     ? `结构校验未通过, partial 结果仅供排查不允许写回。资产覆盖率 ${body.assetCount}/${body.assetCount}, 处理率加总 ${total}/${body.totalRaw}。`
     : `资产覆盖率 ${body.assetCount}/${body.assetCount} = 100%, 原始漏洞处理率 ${total}/${body.totalRaw} = ${((total / body.totalRaw) * 100).toFixed(0)}%, 候选对处理率 100%, 一致性 0 容忍通过。`;
-  return { source: "mock", note, summary: sum, reflection: reflect };
+
+  // taskName 兜底: 从 assetScope 抽核心词 + hits 抽 1-2 个组件
+  const scopeWord = (body.assetScope ?? "目标资产").split(/[ \/·]/)[0] || "目标资产";
+  const components: string[] = [];
+  for (const h of body.hits.slice(0, 4)) {
+    const m = h.name.match(/(OFBiz|Struts2|OpenSSH|log4j2?|runc|XZ Utils|Confluence|Jenkins|TeamCity|GoAnywhere|ActiveMQ)/i);
+    if (m && !components.includes(m[1])) components.push(m[1]);
+    if (components.length >= 2) break;
+  }
+  const compStr = components.length > 0 ? ` ${components.join(" / ")}` : "";
+  const taskName = `${scopeWord}${compStr} 多源比对`;
+
+  return { source: "mock", note, summary: sum, reflection: reflect, taskName };
 }

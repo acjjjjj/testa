@@ -11,6 +11,10 @@ export function WritebackDoneCard() {
   // 真实的 task_id 由 store 在 writebackConfirm 时生成 (幂等 — 同 session 复用)
   // 兜底兼容直接通过 ScenarioSwitcher 跳到 writeback-done 的场景
   const taskId = state.writebackTaskId ?? "RT-20260504-mGqA31f-401";
+  // 任务名称: 优先用 compare-summary 端点 AI 生成的 (跟 ConfirmDialog 一致)
+  const today = new Date().toISOString().slice(0, 10);
+  const aiTaskName = state.compareSummary.kind === "done" ? state.compareSummary.taskName : null;
+  const taskName = aiTaskName ? `${aiTaskName} · ${today}` : `订单中心 多源漏洞清洗 · ${today}`;
   return (
     <div className="msg agent a2">
       <div className="av">A2</div>
@@ -39,7 +43,7 @@ export function WritebackDoneCard() {
           <div className="cb" style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span className="dim2">任务名称</span>
-              <span className="mono em">订单中心 多源漏洞清洗 · 2026-05-04</span>
+              <span className="mono em">{taskName}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span className="dim2">匹配漏洞数</span>

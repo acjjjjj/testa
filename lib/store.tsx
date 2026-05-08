@@ -43,11 +43,31 @@ export type NextActionsState =
   | { kind: "done"; source: "ai" | "mock"; actions: string[] }
   | { kind: "error"; reason: string };
 
-/** A2 比对汇总段落 + reflection 报告的运行态 */
+/** A2 比对汇总段落 + reflection 报告 + 写回 task 名称的运行态 */
 export type CompareSummaryState =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "done"; source: "ai" | "mock"; summary: string; reflection: string }
+  | {
+      kind: "done";
+      source: "ai" | "mock";
+      summary: string;
+      reflection: string;
+      /** 写回风险排查模块的任务名称 (PRD § 3.2.4 字段映射要求由 lui 卡片参数自动生成) */
+      taskName: string;
+    }
+  | { kind: "error"; reason: string };
+
+/** 异常 banner AI 实时叙事的运行态 */
+export type AbnormalNarrationState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | {
+      kind: "done";
+      source: "ai" | "mock";
+      title: string;
+      body: string;
+      footnote: string;
+    }
   | { kind: "error"; reason: string };
 
 /** LUI 参数智能抽取 (A1 / A2 共用) 的运行态 */
@@ -102,8 +122,10 @@ interface DemoState {
   aiRanking: AiRankingState;
   /** A1 真 AI 后续动作建议 (排序完后异步生成) */
   nextActions: NextActionsState;
-  /** A2 真 AI 比对汇总 + reflection (final 阶段异步生成) */
+  /** A2 真 AI 比对汇总 + reflection + taskName (final 阶段异步生成) */
   compareSummary: CompareSummaryState;
+  /** 异常 banner AI 实时叙事 (state.abnormal 切非-none 时异步生成) */
+  abnormalNarration: AbnormalNarrationState;
   /** 用户在底部输入框 / 示例 chip 输入的原始 query */
   userQuery: string;
   /** AI 解析后的 LUI 参数 */
@@ -129,6 +151,7 @@ type Action =
   | { type: "rankingState"; ranking: AiRankingState }
   | { type: "nextActionsState"; nextActions: NextActionsState }
   | { type: "compareSummaryState"; compareSummary: CompareSummaryState }
+  | { type: "abnormalNarrationState"; abnormalNarration: AbnormalNarrationState }
   | { type: "paramsState"; params: ParamsState }
   | { type: "queryStart"; query: string; agent: AgentId; historyId?: string | null }
   | {
@@ -157,6 +180,7 @@ const initialState: DemoState = {
   aiRanking: { kind: "idle" },
   nextActions: { kind: "idle" },
   compareSummary: { kind: "idle" },
+  abnormalNarration: { kind: "idle" },
   userQuery: "",
   paramsState: { kind: "idle" },
   activeHistoryId: null,
@@ -222,6 +246,8 @@ function reducer(state: DemoState, action: Action): DemoState {
       return { ...state, nextActions: action.nextActions };
     case "compareSummaryState":
       return { ...state, compareSummary: action.compareSummary };
+    case "abnormalNarrationState":
+      return { ...state, abnormalNarration: action.abnormalNarration };
     case "paramsState":
       return { ...state, paramsState: action.params };
     case "queryStart": {
@@ -281,6 +307,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         aiRanking: { kind: "idle" },
         nextActions: { kind: "idle" },
         compareSummary: { kind: "idle" },
+        abnormalNarration: { kind: "idle" },
         mergeAnswers: {},
         pendingIdx: 0,
         writebackTaskId: null,
@@ -300,6 +327,7 @@ function reducer(state: DemoState, action: Action): DemoState {
         aiRanking: { kind: "idle" },
         nextActions: { kind: "idle" },
         compareSummary: { kind: "idle" },
+        abnormalNarration: { kind: "idle" },
         mergeAnswers: {},
         pendingIdx: 0,
         handoffVuln: null,
@@ -512,11 +540,12 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
           source: "ai" | "mock";
           summary: string;
           reflection: string;
+          taskName?: string;
         };
       })
       .then((d) => {
         // eslint-disable-next-line no-console
-        console.log(`[compare-summary] ${d.source} ok`);
+        console.log(`[compare-summary] ${d.source} ok, taskName="${d.taskName ?? "(none)"}"`);
         if (!d.summary || !d.reflection) {
           dispatch({
             type: "compareSummaryState",
@@ -531,6 +560,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
             source: d.source,
             summary: d.summary,
             reflection: d.reflection,
+            taskName: d.taskName ?? "多源漏洞清洗比对",
           },
         });
       })
@@ -542,6 +572,69 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       })
       .finally(() => clearTimeout(timeoutId));
   }, [state.stage, state.agent, state.compareSummary.kind, state.mergesConfirmed, state.abnormal]);
+
+  // 异常 banner AI 实时叙事: state.abnormal 切到非-none 时调 /api/abnormal-narrate
+  // 替代 AbnormalAlert.tsx 里 4 类的 MAP 死值 (PRD § 4.6 文案锁定要求作为 system prompt 基线)
+  useEffect(() => {
+    if (state.abnormal === "none") return;
+    if (state.abnormalNarration.kind === "loading" || state.abnormalNarration.kind === "done") return;
+
+    dispatch({ type: "abnormalNarrationState", abnormalNarration: { kind: "loading" } });
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 13000);
+
+    // 拿当前 LUI 抽取的资产范围作为 context, 让叙事更具体
+    const params = state.paramsState.kind === "done" ? state.paramsState.params : null;
+    fetch("/api/abnormal-narrate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: state.abnormal,
+        agent: state.agent,
+        scenario: params?.businessTag ?? "未指定场景",
+        assetScope: params?.assetScope,
+        assetCount: params?.assetCount,
+      }),
+      signal: ctrl.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return (await r.json()) as {
+          source: "ai" | "mock";
+          title: string;
+          body: string;
+          footnote: string;
+        };
+      })
+      .then((d) => {
+        // eslint-disable-next-line no-console
+        console.log(`[abnormal-narrate] ${d.source} ok for kind=${state.abnormal}`);
+        if (!d.title || !d.body || !d.footnote) {
+          dispatch({
+            type: "abnormalNarrationState",
+            abnormalNarration: { kind: "error", reason: "missing fields" },
+          });
+          return;
+        }
+        dispatch({
+          type: "abnormalNarrationState",
+          abnormalNarration: {
+            kind: "done",
+            source: d.source,
+            title: d.title,
+            body: d.body,
+            footnote: d.footnote,
+          },
+        });
+      })
+      .catch((err: unknown) => {
+        const reason = err instanceof Error ? err.message : "unknown";
+        // eslint-disable-next-line no-console
+        console.warn(`[abnormal-narrate] fallback:`, reason);
+        dispatch({ type: "abnormalNarrationState", abnormalNarration: { kind: "error", reason } });
+      })
+      .finally(() => clearTimeout(timeoutId));
+  }, [state.abnormal, state.agent, state.abnormalNarration.kind, state.paramsState]);
 
   useEffect(() => {
     if (state.stage !== "reflect") return;
