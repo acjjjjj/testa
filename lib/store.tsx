@@ -16,6 +16,9 @@ import type {
   RankedVuln,
   MergeAnswer,
   HistoryItem,
+  NextActionsResponse,
+  CompareSummaryResponse,
+  AbnormalNarrateResponse,
 } from "@/types";
 import { MERGE_PAIRS } from "@/data/compare.mock";
 import { A1_RANK_INPUT } from "@/data/vulnerabilities.mock";
@@ -171,7 +174,8 @@ const initialState: DemoState = {
   agent: "a1",
   stage: "welcome",
   abnormal: "none",
-  mergesConfirmed: 2,
+  // PRD § 当前 mock 数据中 ask 类候选对数量见 askPairsCount, 反问预算 LUI_FOLLOWUP_BUDGET=5
+  mergesConfirmed: 0,
   pendingIdx: 0,
   mergeAnswers: {},
   writebackOpen: false,
@@ -482,7 +486,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     })
       .then(async (r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
-        return (await r.json()) as { source: "ai" | "mock"; actions: string[] };
+        return (await r.json()) as NextActionsResponse;
       })
       .then((d) => {
         // eslint-disable-next-line no-console
@@ -536,12 +540,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
       )
       .then(async (r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
-        return (await r.json()) as {
-          source: "ai" | "mock";
-          summary: string;
-          reflection: string;
-          taskName?: string;
-        };
+        return (await r.json()) as CompareSummaryResponse;
       })
       .then((d) => {
         // eslint-disable-next-line no-console
@@ -599,12 +598,7 @@ export function DemoStoreProvider({ children }: { children: React.ReactNode }) {
     })
       .then(async (r) => {
         if (!r.ok) throw new Error("HTTP " + r.status);
-        return (await r.json()) as {
-          source: "ai" | "mock";
-          title: string;
-          body: string;
-          footnote: string;
-        };
+        return (await r.json()) as AbnormalNarrateResponse;
       })
       .then((d) => {
         // eslint-disable-next-line no-console

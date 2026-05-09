@@ -12,6 +12,7 @@
 
 import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, stripCodeFence, clamp } from "../_lib/helpers";
 
 export const runtime = "edge"; // Vercel Edge Function, 冷启动快
 export const maxDuration = 25; // Vercel Hobby Edge 上限, 配合 22s AbortSignal
@@ -135,18 +136,9 @@ function mockResponse(score: number, note?: string): SimilarityOutput {
   };
 }
 
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
-
 function safeParseScore(raw: string): { score: number; reason: string } | null {
   // DeepSeek 在 json_object 模式下偶尔会包多一层代码块, 容错一下
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   try {
     const obj = JSON.parse(cleaned) as { score?: unknown; reason?: unknown };
     const score = typeof obj.score === "number" ? obj.score : Number(obj.score);
@@ -156,8 +148,4 @@ function safeParseScore(raw: string): { score: number; reason: string } | null {
   } catch {
     return null;
   }
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, n));
 }

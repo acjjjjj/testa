@@ -102,3 +102,27 @@ export interface WorkflowToolCall {
   ar: string;
   rt: string;
 }
+
+// ── API 端点响应类型 (lib/store.tsx fetch 用, 跟 6 个 route.ts 对齐) ──
+
+export interface NextActionsResponse {
+  source: "ai" | "mock";
+  model?: string;
+  actions: string[];
+}
+
+export interface CompareSummaryResponse {
+  source: "ai" | "mock";
+  model?: string;
+  summary: string;
+  reflection: string;
+  taskName?: string;
+}
+
+export interface AbnormalNarrateResponse {
+  source: "ai" | "mock";
+  model?: string;
+  title: string;
+  body: string;
+  footnote: string;
+}

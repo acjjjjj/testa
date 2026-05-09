@@ -13,6 +13,7 @@
 import type { NextRequest } from "next/server";
 import type { RankedVuln } from "@/types";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, clamp, toNum, stripCodeFence } from "../_lib/helpers";
 
 export const runtime = "edge";
 export const maxDuration = 30;
@@ -72,7 +73,7 @@ desc 输出: 用 18-30 个汉字给出一句"为什么排这位"的中文理由,
       "vptI": 数值,
       "base": 数值,
       "sceneWeight": 数值,
-      "sceneTag": "红蓝对抗前 / 业务上线前 / 0day 应急 / 日常巡检 / 供应链审视 之一",
+      "sceneTag": "业务上线前 / 夜间窗口 / 合规审计前 / 红蓝对抗前 / 未识别特殊场景 之一 (PRD v0.9 § 3.1.2 锁定 5 类, 不要造其他)",
       "score": 数值,
       "desc": "排这位的中文理由"
     },
@@ -164,13 +165,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 }
 
-// ── helpers ────────────────────────────────────────────────────
-
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
+// ── helpers (端点专属 — 跨端点共用的见 ../_lib/helpers.ts) ──────────────────
 
 type RawRanked = Partial<RankedVuln> & { rk?: number };
 
@@ -178,10 +173,7 @@ function safeParseRanking(
   raw: string,
   items: RankInput["items"]
 ): { summary: string; ranked: RankedVuln[] } | null {
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   let obj: { summary?: unknown; ranked?: unknown };
   try {
     obj = JSON.parse(cleaned);
@@ -209,7 +201,7 @@ function safeParseRanking(
       vptI: clamp(toNum(v.vptI), 0, 10),
       base: clamp(toNum(v.base), 0, 10),
       sceneWeight: clamp(toNum(v.sceneWeight, 1.0), 0.5, 1.5),
-      sceneTag: String(v.sceneTag ?? "日常巡检"),
+      sceneTag: String(v.sceneTag ?? "未识别特殊场景"),
       score: clamp(toNum(v.score), 0, 10),
       desc: String(v.desc ?? findItem(items, v.cve)?.desc ?? ""),
     }));
@@ -224,16 +216,6 @@ function safeParseRanking(
 
 function findItem(items: RankInput["items"], cve: string) {
   return items.find((it) => it.cve === cve);
-}
-
-function toNum(v: unknown, fallback = 0): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Number(n.toFixed(2))));
 }
 
 function mockRanking(items: RankInput["items"], scenario: string, note?: string): RankOutput {

@@ -7,7 +7,8 @@ import { useDemoStore } from "@/lib/store";
  * 演示场景导览 (面向评审 / 领导)
  *
  * 这是给评审方一个全场景速览, 点击任意条目跳到对应 UI 状态查看,
- * 不是开发调试工具. 11 个场景里 5 个含 DeepSeek 实时调用, 标 [AI] 徽标.
+ * 不是开发调试工具. 13 个场景里 6 处接 DeepSeek (5 个主流程标 [AI] 徽标
+ * + 4 个异常 banner 走 abnormal-narrate, 不显式标徽标避免 UI 太花).
  *
  * 默认关闭, 右下角 "演示导览" 按钮唤起.
  */
@@ -33,11 +34,11 @@ export function ScenarioSwitcher() {
       </div>
       <div className="scn-body">
         <div className="scn-intro">
-          v1 demo 覆盖原型 <b>13 个场景</b>, 其中 <b>5 个</b> 接通 DeepSeek 实时调用 (标
-          <span className="scn-badge ai" style={{ marginLeft: 4 }}>
+          v1 demo 覆盖原型 <b>13 个场景</b>, <b>6 处</b> 接通 DeepSeek 实时调用 (主流程
+          <span className="scn-badge ai" style={{ marginLeft: 4, marginRight: 4 }}>
             AI
           </span>
-          ). 点击查看对应 UI / AI 输出。
+          5 处 + 异常 banner 4 类走 abnormal-narrate). 点击查看对应 UI / AI 输出。
         </div>
 
         <div className="scn-sect">主流程</div>

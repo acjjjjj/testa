@@ -12,3 +12,4 @@ release
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+.vercel

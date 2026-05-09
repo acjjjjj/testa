@@ -13,6 +13,8 @@
 
 import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, stripCodeFence } from "../_lib/helpers";
+import { REFLECTION_RETRY_LIMIT } from "@/lib/scoring";
 
 export const runtime = "edge";
 export const maxDuration = 25;
@@ -31,7 +33,7 @@ type CompareSummaryInput = {
   partial?: boolean; // 是否 partial 状态 (reflection 未通过)
 };
 
-const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手 — Agent 2 比对结果汇总"模块。
+const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手 — Agent 2 比对结果汇总"模块 (反思校验重试上限 ${REFLECTION_RETRY_LIMIT} 次, PRD § 2.3 锁定)。
 
 任务: 给定 Agent 2 跑完后的比对统计数据, 输出两段简洁中文:
 
@@ -44,7 +46,7 @@ const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手 — Agent 2 比对
    - 资产覆盖率 (= 已比对资产数 / 输入资产数)
    - 原始漏洞记录处理率 (= 新增 + 合并 + 重复 + 跳过 数量加总, 应该 = 总原始数)
    - 候选合并对处理率 (= 自动合并 + LUI 确认合并 + 不合并 + 待审核 加总, 应该 = 候选对总数)
-   如果 partial=true, 说明 reflection 未通过, 标注 "结构校验未通过, partial 仅供排查"
+   如果 partial=true, 说明 reflection 连续 ${REFLECTION_RETRY_LIMIT} 次未通过, 标注 "结构校验未通过, partial 仅供排查"
 
 3. taskName (12-22 个汉字): 写回鉴微 insight 风险排查模块时的任务名称
    PRD § 3.2.4 字段映射要求 "由 lui 卡片参数自动生成". 必须基于:
@@ -135,16 +137,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 }
 
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
-
 function safeParse(
   raw: string
 ): { summary: string; reflection: string; taskName: string } | null {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     const summary = typeof o.summary === "string" ? o.summary : null;

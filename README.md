@@ -4,7 +4,7 @@
 
 > **在线访问** (推荐给领导看): https://testa-ashen.vercel.app
 >
-> 5 个 AI 端点真接 DeepSeek-chat, 不是 mock。
+> 6 个 AI 端点真接 DeepSeek-chat, 不是 mock。
 
 ## 项目是什么
 
@@ -23,7 +23,7 @@
 
 ### 在线 (Vercel, 已接通 DeepSeek)
 
-直接访问 **https://testa-ashen.vercel.app** — 全功能, 5 个 AI 端点都在跑。
+直接访问 **https://testa-ashen.vercel.app** — 全功能, 6 个 AI 端点都在跑。
 
 ### 本地开发
 
@@ -43,7 +43,7 @@ npm run dev                       # http://localhost:3000
 | `npm start` | 启动生产服务器 |
 | `npm run lint` | 跑 ESLint |
 
-## AI 接入版图 (5 个真端点)
+## AI 接入版图 (6 个真端点)
 
 所有 AI 调用走 Vercel Edge Function 转发到 `api.deepseek.com`, API key 只在服务端环境变量, 前端拿不到。
 
@@ -53,7 +53,8 @@ npm run dev                       # http://localhost:3000
 | **POST `/api/rank`** | A1 排序结果 + 中文 summary | A1 stage=running | top 5 CVE 的 vptA/V/I + 场景权重 + 综合分 + 中文排序原因, 加整体策略 summary |
 | **POST `/api/next-actions`** | A1 后续动作建议 3 条死文案 | A1 排序完成后 | 基于实际排序结果的 3 条针对性建议 (PRD § 3.1.2 步骤 f: 优先处置 / vpt 维度复核 / 跳转批量分配) |
 | **POST `/api/similarity`** | LUI 反问候选对静态 conf | A2 LUI 反问每张候选卡 | 0-100 相似度分 + 中文判断理由 |
-| **POST `/api/compare-summary`** | A2 比对开篇 + reflection 报告 | A2 stage=final | 80-120 字汇总段落 + PRD § 2.3 三层口径 reflection 报告 (资产覆盖率/原始漏洞处理率/候选对处理率) |
+| **POST `/api/compare-summary`** | A2 比对开篇 + reflection 报告 + 写回任务名 | A2 stage=final | 80-120 字汇总段落 + PRD § 2.3 三层口径 reflection 报告 + 写回 taskName |
+| **POST `/api/abnormal-narrate`** | AbnormalAlert 4 类异常 banner 死文案 | state.abnormal 切非-none | { title / body / footnote } 基于实际 context 的中文叙事 (4 类: timeout / patch / partial / budget) |
 
 **所有端点都有 mock 兜底**: 无 API key / 上游超时 / JSON 解析失败时, 自动返回结构化 mock 数据, demo 永不翻车。前端 UI 通过 badge 颜色区分:
 - 🟢 绿色 (mint) = AI 真跑
@@ -93,7 +94,8 @@ app/
     extract-params/route.ts       LUI 参数抽取 + 意图分类
     next-actions/route.ts         A1 后续动作建议
     similarity/route.ts           A2 LUI 反问相似度
-    compare-summary/route.ts      A2 比对汇总 + reflection 报告
+    compare-summary/route.ts      A2 比对汇总 + reflection 报告 + 写回 taskName
+    abnormal-narrate/route.ts     异常 banner 4 类实时叙事
   globals.css                     设计 token (CSS 变量) + 组件样式
   layout.tsx                      根 layout (含 ToastProvider)
   page.tsx                        入口
@@ -154,7 +156,8 @@ types/
 | A1 VPT 三维评分 + 场景识别 + 排序 + 中文 summary | `/api/rank` | 真按 PRD 公式 `min(base × sceneWeight, 10)` |
 | A1 后续动作建议 | `/api/next-actions` | 基于实际排序结果生成 3 条针对性建议 |
 | A2 LUI 反问相似度判断 | `/api/similarity` | 给 0-100 分 + 中文理由 |
-| A2 比对汇总 + reflection 报告 | `/api/compare-summary` | PRD § 2.3 三层口径 |
+| A2 比对汇总 + reflection 报告 + 写回 taskName | `/api/compare-summary` | PRD § 2.3 三层口径 |
+| 异常 banner 实时叙事 | `/api/abnormal-narrate` | 4 类 (timeout/patch/partial/budget), 基于 context 生成具体中文文案, 替代死值 |
 | 闲聊 / 一般问题 | `/api/extract-params` (chat 分支) | 用户输入"你好"/"什么是 vpt" 等非任务 query 时, AI 直接给中文回复 |
 
 ### 🟡 仍是 mock (产品边界 — AI 不该解的事)
@@ -191,14 +194,14 @@ types/
 
 - **主壳子完整** (Rail 8 模块带 hover + click toast / Sidebar 含真搜索过滤 / TopBar 含配置中心 modal)
 - **双 agent 完整链路** (welcome → lui → running → reflect → followup → final)
-- **5 个 AI 端点真接入 DeepSeek** + mock 兜底
+- **6 个 AI 端点真接入 DeepSeek** + mock 兜底
 - **chat 意图分类** (闲聊不强制弹 LUI)
 - **A1**: VPT 三维评分 / 场景权重 / 综合排序分 / AI 后续动作建议 / CSV 导出 (PRD § 3.2.2 锁 5 列) / 跳转 url (vuln_ids + lui_params)
 - **A2**: AI 比对汇总 / 三层口径 reflection 报告 / 命中补丁表 / 5 候选合并对 / 写回幂等 (PRD § 3.2.4 步骤 9)
 - **LUI 反问** (单对确认 + 队列 + 合并/不合并/加入待审核 + DeepSeek 真相似度)
 - **A1 → A2 串联桥**
 - **4 种异常路径** (timeout / patch / partial / budget) + 行为门禁 (partial 写回置灰)
-- **演示导览** (13 场景, 5 个 [AI] 徽标)
+- **演示导览** (13 场景, 6 处接 DeepSeek: 5 个主流程 [AI] 徽标 + 4 个异常 banner 走 abnormal-narrate)
 - **配置中心 modal** (5 段 18 项 PRD 阈值只读展示)
 - **响应式** (1500/1300/1100 三档)
 

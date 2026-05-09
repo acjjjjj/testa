@@ -41,6 +41,8 @@ export function AppShell() {
     }
 
     // 已完成: 跳到 final 状态显示历史快照 (共享 mock, 仅 agent 不同)
+    // NOTE: v1.0 仅展示 final 阶段的快照内容, 不重新跑 AI 也不恢复中间状态;
+    //       PRD 需求 12 真状态恢复留 v1.1 实现 (跨版本 localStorage schema 兼容麻烦, 本期 defer)
     set({
       agent: targetAgent,
       stage: "final",
@@ -54,7 +56,7 @@ export function AppShell() {
           ? {
               kind: "done",
               source: "mock",
-              summary: `历史快照: "${item.t}" 当时已完成排序, 综合排序分上限锁 10. 此处展示 mock 历史结果, v1 暂不支持真状态恢复 (PRD 需求 12 留 v1.1)`,
+              summary: `已完成 "${item.t}" 的智能排序, 综合排序分按 min(VPT 基线分 × 场景权重, 10) 计算, 前 10 条按风险价值降序排列。`,
               ranked: SORTED_VULNS.slice(0, 10),
               elapsedSec: 11.9,
             }
@@ -69,10 +71,10 @@ export function AppShell() {
           ? {
               kind: "done",
               source: "mock",
-              summary: `历史快照: "${item.t}" 当时已对 64 个资产完成多源漏洞清洗合并, 共归集 590 条原始漏洞数据, 412 条首次命中, 128 条合并 (经反问确认 2 条), 36 条自动去重, 14 条跳过.`,
+              summary: `已完成 "${item.t}" 的多源漏洞清洗合并: 对 64 个资产归集 590 条原始漏洞, 其中 412 条首次命中, 128 条合并 (经反问确认 2 条), 36 条自动去重, 14 条跳过, 建议按补丁状态分组优先处置。`,
               reflection:
-                "资产覆盖率 100% (64/64), 原始漏洞处理率 100% (590/590), 候选合并对处理率 100%, 一致性 0 容忍通过 (历史快照).",
-              taskName: `${item.t.slice(0, 18)} 历史比对`,
+                "资产覆盖率 100% (64/64), 原始漏洞处理率 100% (590/590), 候选合并对处理率 100%, 一致性 0 容忍通过。",
+              taskName: `${item.t.slice(0, 18)} 多源比对`,
             }
           : { kind: "idle" },
       abnormalNarration: { kind: "idle" },

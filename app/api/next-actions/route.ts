@@ -15,6 +15,7 @@
 
 import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, stripCodeFence } from "../_lib/helpers";
 
 export const runtime = "edge";
 export const maxDuration = 25;
@@ -121,16 +122,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 }
 
-// ── helpers ──────────────────────────────────────────────────
-
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
+// ── helpers (端点专属 — 跨端点共用的见 ../_lib/helpers.ts) ──────────────────
 
 function safeParse(raw: string): { actions: string[] } | null {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     const actions = Array.isArray(o.actions) ? (o.actions as unknown[]).filter((s) => typeof s === "string").slice(0, 3) : null;

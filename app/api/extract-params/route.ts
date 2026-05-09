@@ -10,6 +10,8 @@
 
 import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, clamp, toNum, stripCodeFence } from "../_lib/helpers";
+import { SCENE_WEIGHTS } from "@/lib/scoring";
 
 export const runtime = "edge";
 export const maxDuration = 25;
@@ -168,16 +170,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 }
 
-// ── helpers ──────────────────────────────────────────────────
-
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
+// ── helpers (端点专属 — 跨端点共用的见 ../_lib/helpers.ts) ──────────────────
 
 function safeParse(raw: string): Omit<ExtractedParams, "source" | "model"> | null {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     const intentRaw = String(o.intent ?? "a1");
@@ -219,16 +215,6 @@ function safeParse(raw: string): Omit<ExtractedParams, "source" | "model"> | nul
   }
 }
 
-function toNum(v: unknown, fallback: number): number {
-  if (typeof v === "number" && Number.isFinite(v)) return v;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Number(n.toFixed(2))));
-}
-
 /** 简易 mock 兜底: 通过 query 关键词粗匹配 + chat 意图启发式 */
 function mockExtract(query: string, agent: "a1" | "a2", note?: string): ExtractedParams {
   const q = query;
@@ -258,12 +244,10 @@ function mockExtract(query: string, agent: "a1" | "a2", note?: string): Extracte
   if (q.includes("中危")) severity = "中危";
   else if (q.includes("低危")) severity = "低危";
 
-  // 场景权重表 v1 锁 5 类 (PRD v0.9 § 3.1.2)
+  // 场景权重表 v1 锁 5 类 (PRD v0.9 § 3.1.2) — 权重值统一从 lib/scoring.ts SCENE_WEIGHTS 查
   let businessTag = "未识别特殊场景";
-  let sceneWeight = 1.0;
   if (q.includes("红蓝") || q.includes("对抗") || q.includes("演练") || q.includes("护网") || q.includes("红队")) {
     businessTag = "红蓝对抗前";
-    sceneWeight = 1.2;
   } else if (
     q.includes("业务上线") ||
     q.includes("发版") ||
@@ -272,14 +256,12 @@ function mockExtract(query: string, agent: "a1" | "a2", note?: string): Extracte
     q.includes("上线前")
   ) {
     businessTag = "业务上线前";
-    sceneWeight = 1.15;
   } else if (q.includes("合规") || q.includes("审计") || q.includes("等保") || q.includes("监管")) {
     businessTag = "合规审计前";
-    sceneWeight = 1.1;
   } else if (q.includes("夜间")) {
     businessTag = "夜间窗口";
-    sceneWeight = 1.05;
   }
+  const sceneWeight = SCENE_WEIGHTS[businessTag] ?? 1.0;
 
   let timeWindow = "近 30 天";
   const m = q.match(/(\d+)\s*天/);

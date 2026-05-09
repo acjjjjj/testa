@@ -13,6 +13,8 @@
 
 import type { NextRequest } from "next/server";
 import { checkAccess, blockResponse } from "../_lib/guard";
+import { extractContent, stripCodeFence } from "../_lib/helpers";
+import { REFLECTION_RETRY_LIMIT, LUI_FOLLOWUP_BUDGET } from "@/lib/scoring";
 
 export const runtime = "edge";
 export const maxDuration = 25;
@@ -54,14 +56,14 @@ const SYSTEM_PROMPT = `你是"鉴微 insight 哨兵 AI 助手"的异常路径叙
    - 必带: 4.4.7 降级 · patch_unavailable=true
 
 3. partial (反思校验未达标):
-   - 触发: reflection 连续 3 次未达标 (例: 资产数与已比对资产数不一致)
+   - 触发: reflection 连续 ${REFLECTION_RETRY_LIMIT} 次未达标 (例: 资产数与已比对资产数不一致)
    - 系统行为: 输出 partial 结果, 未达标项进入跳过清单, 写回按钮置灰
-   - 必带: reflection_retry_limit = 3 · partial=true
+   - 必带: reflection_retry_limit = ${REFLECTION_RETRY_LIMIT} · partial=true
 
 4. budget (反问预算超额):
-   - 触发: LUI 反问轮次 > 5 (lui_followup_budget = 5)
+   - 触发: LUI 反问轮次 > ${LUI_FOLLOWUP_BUDGET} (lui_followup_budget = ${LUI_FOLLOWUP_BUDGET})
    - 系统行为: 后续中置信命中对不再弹窗, 统一进入待审核清单
-   - 必带: lui_followup_budget = 5 · queued = 数字
+   - 必带: lui_followup_budget = ${LUI_FOLLOWUP_BUDGET} · queued = 数字
 
 叙事要点:
 - 必须用 context 里的具体值 (agent / assetScope / 接口名)
@@ -140,16 +142,10 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 }
 
-// ── helpers ──────────────────────────────────────────────────
-
-function extractContent(data: unknown): string | null {
-  if (!data || typeof data !== "object") return null;
-  const choices = (data as { choices?: Array<{ message?: { content?: string } }> }).choices;
-  return choices?.[0]?.message?.content ?? null;
-}
+// ── helpers (端点专属 — 跨端点共用的见 ../_lib/helpers.ts) ──────────────────
 
 function safeParse(raw: string): { title: string; body: string; footnote: string } | null {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = stripCodeFence(raw);
   try {
     const o = JSON.parse(cleaned) as Record<string, unknown>;
     const title = typeof o.title === "string" ? o.title : null;
@@ -187,14 +183,14 @@ function mockNarrate(
       footnote: "4.4.7 降级 · patch_unavailable=true",
     },
     partial: {
-      title: "反思校验 3 次未达标, 输出 partial 结果",
+      title: `反思校验 ${REFLECTION_RETRY_LIMIT} 次未达标, 输出 partial 结果`,
       body: `已处理 134 / ${body.assetCount ?? 142} 条, 8 条进入跳过清单 (无访问权限 5 / 接口失败 3). 结果仅供排查, 不允许写回风险排查模块.`,
-      footnote: "reflection_retry_limit = 3 · partial=true",
+      footnote: `reflection_retry_limit = ${REFLECTION_RETRY_LIMIT} · partial=true`,
     },
     budget: {
       title: "反问预算已用完, 剩余进入待审核清单",
-      body: "本轮 5 次 LUI 反问已用完, 后续 3 对中置信命中不再弹窗, 已统一进入待审核清单, 等待你手动复核.",
-      footnote: "lui_followup_budget = 5 · queued = 3",
+      body: `本轮 ${LUI_FOLLOWUP_BUDGET} 次 LUI 反问已用完, 后续 3 对中置信命中不再弹窗, 已统一进入待审核清单, 等待你手动复核.`,
+      footnote: `lui_followup_budget = ${LUI_FOLLOWUP_BUDGET} · queued = 3`,
     },
   };
   return { source: "mock", note, ...map[body.kind] };

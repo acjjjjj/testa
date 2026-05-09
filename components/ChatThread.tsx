@@ -159,13 +159,18 @@ export function ChatThread() {
   return (
     <div style={convAreaStyle}>
       <div style={convInnerStyle}>
-        {/* 用户消息 */}
+        {/* 用户消息 — 时间用当前时间, 跟下方 chat 气泡保持一致 (避免硬编码) */}
         <div className="msg user">
           <div className="av">An</div>
           <div className="body">
             <div className="who">
               <b>An</b>
-              <span className="dim2">10:41</span>
+              <span className="dim2">
+                {new Date().toLocaleTimeString("zh-CN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
             </div>
             <div className="text">{userQuery || defaultUserQueryFor(agent)}</div>
           </div>
